@@ -15,8 +15,18 @@ expect(manifest.background?.service_worker === "service-worker.mjs", "service wo
 expect(manifest.action?.default_popup === "panel.html", "toolbar popup is missing");
 expect(manifest.permissions?.includes("nativeMessaging"), "nativeMessaging permission is missing");
 expect(manifest.permissions?.includes("storage"), "storage permission is missing");
+expect(manifest.permissions?.includes("scripting"), "scripting permission is missing");
 expect(!manifest.host_permissions, "host_permissions are not allowed in the MVP");
 expect(!manifest.content_scripts, "content scripts are not allowed in the MVP");
+expect(
+  JSON.stringify(manifest.optional_host_permissions) ===
+    JSON.stringify([
+      "https://www.youtube.com/*",
+      "https://www.tiktok.com/*",
+      "https://www.instagram.com/*"
+    ]),
+  "optional host permissions must stay limited to supported feeds"
+);
 
 for (const relativePath of referencedFiles(manifest)) {
   expect(

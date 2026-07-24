@@ -34,6 +34,7 @@ test("installer merges and removes hooks without overwriting existing settings",
     fs.readFileSync(path.join(target, ".codex", "hooks.json"), "utf8")
   );
   assert.ok(codexHooks.hooks.UserPromptSubmit);
+  assert.ok(codexHooks.hooks.PostToolUse);
   const codexHookCommand =
     codexHooks.hooks.UserPromptSubmit[0].hooks[0].command;
   assert.match(codexHookCommand, new RegExp(escapeRegExp(process.execPath)));

@@ -43,6 +43,14 @@ test("presents disabled, paused, active, disconnected, and ready states", () => 
   assert.equal(
     statusPresentation({
       settings: readySettings,
+      activity: { working: 2, attention: 1, ready: 1 },
+      feedSession: { agent: "codex", state: "parked" }
+    }).title,
+    "Codex needs you"
+  );
+  assert.equal(
+    statusPresentation({
+      settings: readySettings,
       connectionState: "disconnected",
       lastError: "Missing host."
     }).title,

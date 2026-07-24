@@ -53,9 +53,15 @@ if (action === "install") {
     );
   }
   if (targets.includes("codex")) {
-    console.log(
-      'Codex requires hook approval: start Codex CLI, enter "/hooks", and trust the FirstTok hooks.'
-    );
+    const codexCli = findCodexCli();
+    if (codexCli) {
+      console.log(`Codex hook approval: ${shellQuote(codexCli)}`);
+      console.log('Then enter "/hooks" and trust the FirstTok hooks.');
+    } else {
+      console.log(
+        'Codex requires hook approval: start Codex CLI, enter "/hooks", and trust the FirstTok hooks.'
+      );
+    }
   }
 }
 
@@ -105,11 +111,18 @@ function installHooks(provider) {
 
   const events =
     provider === "codex"
-      ? ["UserPromptSubmit", "PermissionRequest", "Stop", "SessionEnd"]
+      ? [
+          "UserPromptSubmit",
+          "PermissionRequest",
+          "PostToolUse",
+          "Stop",
+          "SessionEnd"
+        ]
       : [
           "UserPromptSubmit",
           "PermissionRequest",
           "Notification",
+          "PostToolUse",
           "Stop",
           "SessionEnd"
         ];
@@ -185,6 +198,27 @@ function installedNativeLauncherPath() {
     "FirstTok",
     "firsttok-native-host"
   );
+}
+
+function findCodexCli() {
+  const candidates = [
+    process.env.CODEX_CLI_PATH,
+    ...String(process.env.PATH ?? "")
+      .split(path.delimiter)
+      .filter(Boolean)
+      .map((directory) => path.join(directory, "codex")),
+    "/Applications/ChatGPT.app/Contents/Resources/codex",
+    "/Applications/Codex.app/Contents/Resources/codex"
+  ];
+  return candidates.find((candidate) => {
+    if (!candidate) return false;
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  });
 }
 
 function extensionId() {

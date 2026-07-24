@@ -22,6 +22,7 @@ test("clamps untrusted settings and falls back to a known provider", () => {
       agents: DEFAULT_SETTINGS.agents,
       pausedUntil: DEFAULT_SETTINGS.pausedUntil,
       provider: "youtube",
+      pauseMedia: DEFAULT_SETTINGS.pauseMedia,
       delayMs: 0,
       windowWidth: 900,
       windowHeight: DEFAULT_SETTINGS.windowHeight
@@ -56,6 +57,7 @@ test("identifies terminal events and stable session keys", () => {
     turnId: "turn"
   };
   assert.equal(sessionKey(event), "codex:session:turn");
-  assert.equal(isTerminalEvent({ type: "attention.required" }), true);
+  assert.equal(isTerminalEvent({ type: "attention.required" }), false);
+  assert.equal(isTerminalEvent({ type: "work.completed" }), true);
   assert.equal(isTerminalEvent({ type: "work.started" }), false);
 });

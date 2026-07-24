@@ -6,6 +6,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   }),
   pausedUntil: 0,
   provider: "youtube",
+  pauseMedia: false,
   delayMs: 2000,
   windowWidth: 480,
   windowHeight: 820
@@ -31,11 +32,7 @@ export function sessionKey(event) {
 }
 
 export function isTerminalEvent(event) {
-  return [
-    "attention.required",
-    "work.completed",
-    "session.ended"
-  ].includes(event.type);
+  return ["work.completed", "session.ended"].includes(event.type);
 }
 
 export function sessionEligibility(settings, event, now = Date.now()) {
@@ -73,6 +70,10 @@ export function clampSettings(input = {}) {
       DEFAULT_SETTINGS.pausedUntil
     ),
     provider,
+    pauseMedia:
+      typeof input.pauseMedia === "boolean"
+        ? input.pauseMedia
+        : DEFAULT_SETTINGS.pauseMedia,
     delayMs: clampNumber(input.delayMs, 0, 15_000, DEFAULT_SETTINGS.delayMs),
     windowWidth: clampNumber(
       input.windowWidth,

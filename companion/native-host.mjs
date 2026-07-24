@@ -129,24 +129,26 @@ function recordEvent(event) {
 async function handleExtensionMessage(message) {
   if (!message || typeof message !== "object") return;
 
-  if (message.type === "feed.closed" || message.type === "session.return") {
-    const session = sessions.get(
-      `${message.agent}:${message.sessionId}:${message.turnId}`
-    );
+  if (
+    message.type === "feed.closed" ||
+    message.type === "session.return" ||
+    message.type === "source.focus"
+  ) {
+    const key = messageKey(message);
+    const session = sessions.get(key);
+    const source = session ?? message;
     let restored = false;
     let restoreError = null;
-    if (session?.sourceApp) {
+    if (source?.sourceApp) {
       try {
-        restored = await focusApplication(session.sourceApp);
+        restored = await focusApplication(source.sourceApp);
       } catch (error) {
         restoreError = error;
         await notifyFocusFailure();
       }
     }
     if (message.final !== false) {
-      sessions.delete(
-        `${message.agent}:${message.sessionId}:${message.turnId}`
-      );
+      sessions.delete(key);
       persistState();
     }
     sendNative({
@@ -161,6 +163,23 @@ async function handleExtensionMessage(message) {
         message: "The feed closed, but the source application could not be restored."
       });
     }
+    return;
+  }
+
+  if (message.type === "source.notify") {
+    const key = messageKey(message);
+    const session = sessions.get(key);
+    await notifyReady(session ?? message);
+    if (message.final !== false) {
+      sessions.delete(key);
+      persistState();
+    }
+    return;
+  }
+
+  if (message.type === "task.release") {
+    sessions.delete(messageKey(message));
+    persistState();
     return;
   }
 
@@ -201,6 +220,23 @@ async function notifyFocusFailure() {
   }
 }
 
+async function notifyReady(session) {
+  if (process.platform !== "darwin") return;
+  const agent = session?.agent === "claude-code" ? "Claude Code" : "Codex";
+  try {
+    await execFileAsync(
+      "/usr/bin/osascript",
+      [
+        "-e",
+        `display notification "${agent} is ready." with title "FirstTok"`
+      ],
+      { timeout: 2_000 }
+    );
+  } catch {
+    // Notification failure must never affect the agent lifecycle.
+  }
+}
+
 function sendNative(message) {
   if (!extensionConnected) return;
   process.stdout.write(encodeNativeMessage(message));
@@ -237,6 +273,10 @@ function persistState() {
 
 function sessionKey(event) {
   return `${event.agent}:${event.sessionId}:${event.turnId}`;
+}
+
+function messageKey(message) {
+  return `${message.agent}:${message.sessionId}:${message.turnId}`;
 }
 
 function cleanupSocket() {

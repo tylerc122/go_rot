@@ -70,6 +70,42 @@ test("hook events travel through the local companion to native messaging", async
   assert.equal(lifecycle.event.type, "work.started");
   assert.equal(lifecycle.event.sourceApp, "Terminal");
   assert.equal("prompt" in lifecycle.event, false);
+
+  const resumeHook = spawn(
+    process.execPath,
+    [
+      path.join(root, "bin", "firsttok-hook.mjs"),
+      "--provider",
+      "codex",
+      "--surface",
+      "cli"
+    ],
+    { cwd: root, env: environment, stdio: ["pipe", "pipe", "pipe"] }
+  );
+  resumeHook.stdin.end(
+    JSON.stringify({
+      hook_event_name: "PostToolUse",
+      session_id: "session-e2e",
+      turn_id: "turn-e2e",
+      tool_response: "must stay private"
+    })
+  );
+  await new Promise((resolve) => resumeHook.once("close", resolve));
+  await waitFor(
+    () =>
+      messages.filter(
+        (message) =>
+          message.type === "lifecycle.event" &&
+          message.event.sessionId === "session-e2e"
+      ).length === 2
+  );
+  const resumed = messages.filter(
+    (message) =>
+      message.type === "lifecycle.event" &&
+      message.event.sessionId === "session-e2e"
+  )[1];
+  assert.equal(resumed.event.type, "work.resumed");
+  assert.equal("tool_response" in resumed.event, false);
 });
 
 test("the self-contained Codex plugin hook uses the same private transport", async (t) => {

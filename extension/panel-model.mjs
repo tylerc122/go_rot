@@ -12,6 +12,11 @@ export function pauseDeadline(option, now = new Date()) {
 
 export function statusPresentation(snapshot, now = Date.now()) {
   const settings = snapshot?.settings;
+  const activity = {
+    working: snapshot?.activity?.working ?? 0,
+    attention: snapshot?.activity?.attention ?? 0,
+    ready: snapshot?.activity?.ready ?? snapshot?.backgroundReady ?? 0
+  };
   if (!settings?.enabled) {
     return {
       tone: "muted",
@@ -28,18 +33,51 @@ export function statusPresentation(snapshot, now = Date.now()) {
     };
   }
 
-  if (snapshot?.activeSession) {
-    const agent = agentLabel(snapshot.activeSession.agent);
-    const state = snapshot.activeSession.state;
+  if (activity.attention > 0) {
+    const attentionSession = snapshot?.feedSession ?? snapshot?.activeSession;
+    const agent = attentionSession?.agent
+      ? agentLabel(attentionSession.agent)
+      : "Your agent";
+    return {
+      tone: "attention",
+      title: `${agent} needs you`,
+      detail:
+        activity.attention === 1
+          ? "Feed parked at the same video."
+          : `${activity.attention} tasks are waiting for input.`
+    };
+  }
+
+  if (snapshot?.feedSession ?? snapshot?.activeSession) {
+    const session = snapshot.feedSession ?? snapshot.activeSession;
+    const agent = session.agent ? agentLabel(session.agent) : "Your agent";
+    const state = session.state;
+    const title =
+      activity.working > 1
+        ? `${activity.working} tasks working`
+        : `${agent} is working`;
     return {
       tone: "active",
-      title: `${agent} is working`,
+      title,
       detail:
         state === "active"
           ? "Your feed is open."
           : state === "waiting"
             ? "Waiting for the launch delay."
-            : "Opening your feed."
+            : state === "parked"
+              ? "Feed parked at the same video."
+              : "Opening your feed."
+    };
+  }
+
+  if (activity.working > 0) {
+    return {
+      tone: "active",
+      title:
+        activity.working === 1
+          ? "1 task working"
+          : `${activity.working} tasks working`,
+      detail: "The feed was closed for this round."
     };
   }
 

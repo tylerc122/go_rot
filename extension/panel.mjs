@@ -12,6 +12,7 @@ const elements = {
   delay: document.querySelector("#delay"),
   providers: [...document.querySelectorAll('input[name="provider"]')],
   testFeed: document.querySelector("#test-feed"),
+  pauseMedia: document.querySelector("#pause-media"),
   pauseDetail: document.querySelector("#pause-detail"),
   pauseControls: document.querySelector("#pause-controls"),
   pauseDuration: document.querySelector("#pause-duration"),
@@ -44,10 +45,26 @@ function bindEvents() {
   });
 
   for (const provider of elements.providers) {
-    provider.addEventListener("change", () => {
-      if (provider.checked) updateSettings({ provider: provider.value });
+    provider.addEventListener("change", async () => {
+      if (!provider.checked) return;
+      let pauseMedia = elements.pauseMedia.checked;
+      if (pauseMedia) {
+        pauseMedia = await requestFeedAccess(provider.value);
+        elements.pauseMedia.checked = pauseMedia;
+      }
+      updateSettings({ provider: provider.value, pauseMedia });
     });
   }
+
+  elements.pauseMedia.addEventListener("change", async () => {
+    if (!elements.pauseMedia.checked) {
+      updateSettings({ pauseMedia: false });
+      return;
+    }
+    const granted = await requestFeedAccess(selectedProvider());
+    elements.pauseMedia.checked = granted;
+    updateSettings({ pauseMedia: granted });
+  });
 
   elements.agentClaude.addEventListener("change", updateAgents);
   elements.agentCodex.addEventListener("change", updateAgents);
@@ -126,6 +143,7 @@ function render(next) {
   elements.delay.value = String(settings.delayMs);
   elements.agentClaude.checked = settings.agents["claude-code"];
   elements.agentCodex.checked = settings.agents.codex;
+  elements.pauseMedia.checked = settings.pauseMedia;
   for (const provider of elements.providers) {
     provider.checked = provider.value === settings.provider;
   }
@@ -135,19 +153,45 @@ function render(next) {
   elements.statusDetail.textContent = status.detail;
   elements.reconnect.hidden = next.connectionState !== "disconnected";
   elements.testFeed.disabled = next.connectionState !== "connected";
-  elements.return.disabled = !next.activeSession;
+  elements.return.disabled = !(next.feedSession ?? next.activeSession);
 
-  elements.readyNotice.hidden = next.backgroundReady === 0;
-  elements.readyCopy.textContent =
-    next.backgroundReady === 1
-      ? "1 background turn is ready."
-      : `${next.backgroundReady} background turns are ready.`;
+  const activity = next.activity ?? {
+    working: next.activeSession ? 1 : 0,
+    attention: 0,
+    ready: next.backgroundReady ?? 0
+  };
+  const activityParts = [];
+  if (activity.working > 0) activityParts.push(`${activity.working} working`);
+  if (activity.attention > 0) activityParts.push(`${activity.attention} needs you`);
+  if (activity.ready > 0) activityParts.push(`${activity.ready} ready`);
+  elements.readyNotice.hidden = activityParts.length === 0;
+  elements.readyNotice.dataset.tone =
+    activity.attention > 0 ? "attention" : activity.working > 0 ? "working" : "ready";
+  elements.readyCopy.textContent = activityParts.join(" · ");
+  elements.clearReady.hidden = activity.ready === 0;
 
   elements.pauseControls.hidden = paused;
   elements.resume.hidden = !paused;
   elements.pauseDetail.textContent = paused
     ? status.detail
     : "Temporarily ignore new work.";
+}
+
+function selectedProvider() {
+  return elements.providers.find((provider) => provider.checked)?.value ?? "youtube";
+}
+
+async function requestFeedAccess(provider) {
+  const origins = {
+    youtube: ["https://www.youtube.com/*"],
+    tiktok: ["https://www.tiktok.com/*"],
+    instagram: ["https://www.instagram.com/*"]
+  };
+  try {
+    return await chrome.permissions.request({ origins: origins[provider] });
+  } catch {
+    return false;
+  }
 }
 
 async function send(message) {

@@ -2,50 +2,103 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { SessionRegistry } from "../extension/session-registry.mjs";
 
-test("keeps one active session and never lets background completion steal it", () => {
+function task(agent, sessionId, turnId) {
+  return {
+    event: { agent, sessionId, turnId },
+    state: "working"
+  };
+}
+
+test("tracks concurrent work, attention, and ready turns independently", () => {
   const registry = new SessionRegistry();
-  const first = { state: "waiting", source: "Codex" };
-  const second = { state: "waiting", source: "Claude" };
+  const first = task("codex", "s1", "t1");
+  const second = task("claude-code", "s2", "t2");
 
-  assert.equal(registry.start("first", first).kind, "active");
-  assert.equal(registry.start("second", second).kind, "background");
-  assert.equal(second.state, "background");
+  assert.equal(registry.start("first", first).kind, "started");
+  assert.equal(registry.start("second", second).kind, "started");
+  assert.deepEqual(registry.counts(), {
+    working: 2,
+    attention: 0,
+    ready: 0
+  });
 
-  const terminal = registry.terminal("second");
-  assert.equal(terminal.kind, "background");
-  assert.equal(registry.active(), first);
-  assert.equal(registry.readyCount(), 1);
+  registry.requireAttention("first", {
+    ...first.event,
+    reason: "permission"
+  });
+  registry.complete("second", second.event);
+  assert.deepEqual(registry.counts(), {
+    working: 0,
+    attention: 1,
+    ready: 1
+  });
+  assert.equal(registry.latestAttention(), first);
 });
 
-test("deduplicates starts and releases only the matching active session", () => {
+test("resumes an exact permission turn and deduplicates active work", () => {
   const registry = new SessionRegistry();
-  const session = { state: "waiting" };
+  const active = task("codex", "session", "turn");
 
-  assert.equal(registry.start("turn", session).kind, "active");
-  assert.equal(registry.start("turn", {}).kind, "duplicate");
-  assert.equal(registry.terminal("turn").kind, "active");
+  assert.equal(registry.start("turn", active).kind, "started");
+  assert.equal(registry.start("turn", task("codex", "session", "turn")).kind, "duplicate");
+  registry.requireAttention("turn", {
+    ...active.event,
+    reason: "permission"
+  });
+  assert.equal(registry.resume("turn", active.event).kind, "resumed");
+  assert.deepEqual(registry.counts(), {
+    working: 1,
+    attention: 0,
+    ready: 0
+  });
+});
 
-  registry.complete("turn");
-  assert.equal(registry.active(), null);
-  assert.equal(registry.terminal("turn").kind, "missing");
+test("late resume signals cannot resurrect a ready turn", () => {
+  const registry = new SessionRegistry();
+  const finished = task("codex", "session", "turn");
+  registry.start("turn", finished);
+  registry.complete("turn", finished.event);
+
+  assert.equal(registry.resume("turn", finished.event).kind, "unchanged");
+  assert.deepEqual(registry.counts(), {
+    working: 0,
+    attention: 0,
+    ready: 1
+  });
+});
+
+test("a new user turn resolves an older question in the same provider session", () => {
+  const registry = new SessionRegistry();
+  const question = task("claude-code", "session", "turn-1");
+  registry.start("turn-1", question);
+  registry.requireAttention("turn-1", {
+    ...question.event,
+    reason: "question"
+  });
+
+  const answer = task("claude-code", "session", "turn-2");
+  const result = registry.start("turn-2", answer);
+  assert.equal(result.kind, "resumed");
+  assert.equal(result.resumed.length, 1);
+  assert.deepEqual(registry.counts(), {
+    working: 1,
+    attention: 0,
+    ready: 0
+  });
 });
 
 test("cleans an entire provider session even when SessionEnd has no turn id", () => {
   const registry = new SessionRegistry();
-  const active = {
-    state: "waiting",
-    event: { agent: "codex", sessionId: "session-1" }
-  };
-  const background = {
-    state: "waiting",
-    event: { agent: "codex", sessionId: "session-1" }
-  };
+  registry.start(
+    "codex:session-1:turn-1",
+    task("codex", "session-1", "turn-1")
+  );
+  registry.start(
+    "codex:session-1:turn-2",
+    task("codex", "session-1", "turn-2")
+  );
 
-  registry.start("codex:session-1:turn-1", active);
-  registry.start("codex:session-1:turn-2", background);
-
-  assert.equal(registry.endSession("codex", "session-1"), active);
-  registry.complete("codex:session-1:turn-1");
-  assert.equal(registry.active(), null);
-  assert.equal(registry.terminal("codex:session-1:turn-2").kind, "missing");
+  const removed = registry.endSession("codex", "session-1");
+  assert.equal(removed.length, 2);
+  assert.equal(registry.pendingCount(), 0);
 });

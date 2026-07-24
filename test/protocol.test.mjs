@@ -43,7 +43,7 @@ test("maps shared provider hooks into normalized lifecycle events", () => {
   assert.equal("prompt" in started, false);
 });
 
-test("maps permission, notification, stop, and session end hooks", () => {
+test("maps permission, resume, notification, stop, and session end hooks", () => {
   const options = {
     agent: "claude-code",
     surface: "desktop",
@@ -61,6 +61,7 @@ test("maps permission, notification, stop, and session end hooks", () => {
     );
 
   assert.equal(fixture("PermissionRequest").reason, "permission");
+  assert.equal(fixture("PostToolUse").type, "work.resumed");
   assert.equal(
     fixture("Notification", { notification_type: "idle_prompt" }).reason,
     "question"

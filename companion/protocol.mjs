@@ -4,6 +4,7 @@ const AGENTS = new Set(["claude-code", "codex"]);
 const SURFACES = new Set(["cli", "desktop"]);
 const EVENT_TYPES = new Set([
   "work.started",
+  "work.resumed",
   "attention.required",
   "work.completed",
   "session.ended"
@@ -115,6 +116,8 @@ function mapHookName(hookName, input) {
       return { type: "work.started" };
     case "PermissionRequest":
       return { type: "attention.required", reason: "permission" };
+    case "PostToolUse":
+      return { type: "work.resumed" };
     case "Notification":
       if (input?.notification_type === "permission_prompt") {
         return { type: "attention.required", reason: "permission" };

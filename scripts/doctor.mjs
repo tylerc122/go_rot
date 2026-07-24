@@ -35,13 +35,17 @@ check(
   "Claude Code hook config + runtime",
   hookConfigIsValid(path.join(home, ".claude", "settings.json"))
 );
+const codexCli = findCodexCli();
+check("Codex CLI for hook approval", Boolean(codexCli), true);
 check("Companion connection", await socketIsReachable(), true);
 
 console.log(`\nExtension directory: ${path.join(root, "extension")}`);
 console.log(`Extension ID: ${extensionId()}`);
+console.log("\nACTION  Codex hook approval cannot be checked automatically.");
 console.log(
-  '\nACTION  Codex hook approval cannot be checked automatically.\n' +
-    '        Start Codex CLI, enter "/hooks", and trust the FirstTok hooks.'
+  codexCli
+    ? `        Run ${shellQuote(codexCli)}, enter "/hooks", and trust FirstTok.`
+    : '        Start Codex CLI, enter "/hooks", and trust the FirstTok hooks.'
 );
 if (!checks.find((item) => item.label === "Companion connection")?.ok) {
   console.log(
@@ -66,11 +70,33 @@ function hookConfigIsValid(filePath) {
     return (
       config.includes("FIRSTTOK_HOOK") &&
       config.includes(process.execPath) &&
+      config.includes("PostToolUse") &&
       !config.includes("FIRSTTOK_HOOK=1 /usr/bin/env node")
     );
   } catch {
     return false;
   }
+}
+
+function findCodexCli() {
+  const candidates = [
+    process.env.CODEX_CLI_PATH,
+    ...String(process.env.PATH ?? "")
+      .split(path.delimiter)
+      .filter(Boolean)
+      .map((directory) => path.join(directory, "codex")),
+    "/Applications/ChatGPT.app/Contents/Resources/codex",
+    "/Applications/Codex.app/Contents/Resources/codex"
+  ];
+  return candidates.find((candidate) => {
+    if (!candidate) return false;
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  });
 }
 
 function readJson(filePath) {
@@ -159,4 +185,8 @@ function extensionId() {
     .flatMap((byte) => [byte >> 4, byte & 15])
     .map((nibble) => String.fromCharCode(97 + nibble))
     .join("");
+}
+
+function shellQuote(value) {
+  return `'${String(value).replaceAll("'", "'\\''")}'`;
 }

@@ -187,6 +187,11 @@ h2,
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
+.status[data-tone="attention"] .status-dot {
+  background: var(--danger);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 14%, transparent);
+}
+
 .status[data-tone="paused"] .status-dot,
 .status[data-tone="connecting"] .status-dot {
   background: var(--warning);
@@ -233,9 +238,20 @@ h2,
   min-height: 40px;
   padding: 5px 20px;
   border-bottom: 1px solid var(--rule);
-  background: #f9eee7;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
   color: #6f3025;
   font-size: 12px;
+  font-weight: 630;
+}
+
+.ready-notice[data-tone="attention"] {
+  background: color-mix(in srgb, var(--danger) 9%, var(--surface));
+  color: var(--danger);
+}
+
+.ready-notice[data-tone="working"] {
+  background: #f3efe7;
+  color: var(--ink);
 }
 
 .section {
@@ -360,6 +376,41 @@ select {
 .helper {
   margin-top: 7px;
   text-align: center;
+}
+
+.permission-row {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
+  cursor: pointer;
+}
+
+.permission-row span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.permission-row strong {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.permission-row small {
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.permission-row input {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  accent-color: var(--accent);
 }
 
 .split-section {

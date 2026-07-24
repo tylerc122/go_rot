@@ -8,8 +8,10 @@
     "install:mvp": "node scripts/install.mjs install --all",
     "uninstall:mvp": "node scripts/install.mjs uninstall --all",
     "doctor": "node scripts/doctor.mjs",
+    "package:alpha": "node scripts/package-alpha.mjs",
     "benchmark:hook": "node scripts/benchmark-hook.mjs",
     "validate:extension": "node scripts/validate-extension.mjs",
+    "validate:docs": "node scripts/validate-docs.mjs",
     "test": "node --test",
     "test:watch": "node --test --watch"
   },

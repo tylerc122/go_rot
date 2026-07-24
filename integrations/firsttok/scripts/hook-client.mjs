@@ -27,6 +27,8 @@ function mapHook(payload) {
       return { type: "work.started" };
     case "PermissionRequest":
       return { type: "attention.required", reason: "permission" };
+    case "PostToolUse":
+      return { type: "work.resumed" };
     case "Stop":
       return { type: "work.completed" };
     case "SessionEnd":
