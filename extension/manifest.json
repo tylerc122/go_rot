@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "FirstTok",
+  "version": "0.1.0",
+  "description": "Watch your real feed while Claude Code or Codex works, then return automatically.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApY3VrX+ik3vXrCfRH4r2TzVlg8TddJsVYn7mquuPzm2yMk5UhBGRBGDCsk0h4/rt9e4xse6lwuw5fWl6SDPr11YB0hKtOCitVLMqmNUMVeZCaGBBOaOUUok69Qgk9H0ASc+L5/dbNQqLgeW0DNwnOaLPypN2cunlWjfmfPbNq67stv1aBo7sLbbS/p637rEmqtnj10aAOYfkvF1kiRAMes3ul+ivAUFgPxJ9FRighhyjotrqtrHqAHp6tkVPqVuIPmlcDjuoSNAqwgXZOIDh+MH+C6MNXznPcip/+VzHiRIPkk9duYb5WhzDvjRbjAbyChCJLin3tLV2XPzkzCYANQIDAQAB",
+  "icons": {
+    "16": "assets/icon-16.png",
+    "32": "assets/icon-32.png",
+    "48": "assets/icon-48.png",
+    "128": "assets/icon-128.png"
+  },
+  "permissions": [
+    "nativeMessaging",
+    "storage"
+  ],
+  "background": {
+    "service_worker": "service-worker.mjs",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "FirstTok",
+    "default_popup": "panel.html",
+    "default_icon": {
+      "16": "assets/icon-16.png",
+      "32": "assets/icon-32.png"
+    }
+  },
+  "options_ui": {
+    "page": "panel.html",
+    "open_in_tab": true
+  },
+  "commands": {
+    "return-to-agent": {
+      "suggested_key": {
+        "default": "Alt+Shift+B",
+        "mac": "MacCtrl+Shift+B"
+      },
+      "description": "Close FirstTok and return to the active agent"
+    }
+  }
+}

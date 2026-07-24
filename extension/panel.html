@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>FirstTok</title>
+    <link rel="stylesheet" href="panel.css">
+  </head>
+  <body>
+    <main class="panel">
+      <header class="masthead">
+        <div class="identity">
+          <div class="mark" aria-hidden="true">F</div>
+          <div>
+            <h1>FirstTok</h1>
+            <p>Scroll while your agent works.</p>
+          </div>
+        </div>
+
+        <label class="switch" aria-label="Enable FirstTok">
+          <input id="enabled" type="checkbox">
+          <span class="switch-track" aria-hidden="true"></span>
+        </label>
+      </header>
+
+      <section class="status" aria-live="polite">
+        <span id="status-dot" class="status-dot" aria-hidden="true"></span>
+        <div class="status-copy">
+          <strong id="status-title">Connecting</strong>
+          <span id="status-detail">Starting the local companion.</span>
+        </div>
+        <button id="reconnect" class="text-button" type="button" hidden>
+          Retry
+        </button>
+      </section>
+
+      <aside id="ready-notice" class="ready-notice" hidden>
+        <span id="ready-copy"></span>
+        <button id="clear-ready" class="text-button" type="button">Clear</button>
+      </aside>
+
+      <section class="section">
+        <div class="section-heading">
+          <h2>Feed</h2>
+          <label class="delay">
+            <span>Open after</span>
+            <select id="delay">
+              <option value="0">Immediately</option>
+              <option value="1000">1 sec</option>
+              <option value="2000">2 sec</option>
+              <option value="3000">3 sec</option>
+              <option value="5000">5 sec</option>
+              <option value="10000">10 sec</option>
+            </select>
+          </label>
+        </div>
+
+        <fieldset class="provider-picker">
+          <legend>Choose a feed</legend>
+          <label>
+            <input type="radio" name="provider" value="youtube">
+            <span>Shorts</span>
+          </label>
+          <label>
+            <input type="radio" name="provider" value="tiktok">
+            <span>TikTok</span>
+          </label>
+          <label>
+            <input type="radio" name="provider" value="instagram">
+            <span>Reels</span>
+          </label>
+        </fieldset>
+
+        <button id="test-feed" class="primary-button" type="button">
+          Test connection + feed
+        </button>
+        <p class="helper">
+          Available when Ready. Opens your feed for 3 seconds, then closes it.
+        </p>
+      </section>
+
+      <section class="section split-section">
+        <div>
+          <h2>Pause</h2>
+          <p id="pause-detail" class="section-note">Temporarily ignore new work.</p>
+        </div>
+        <div id="pause-controls" class="inline-controls">
+          <select id="pause-duration" aria-label="Pause duration">
+            <option value="15m">15 min</option>
+            <option value="1h">1 hour</option>
+            <option value="tomorrow">Until tomorrow</option>
+          </select>
+          <button id="pause" class="secondary-button compact" type="button">
+            Pause
+          </button>
+        </div>
+        <button id="resume" class="secondary-button compact" type="button" hidden>
+          Resume
+        </button>
+      </section>
+
+      <section class="section agents">
+        <h2>Agents</h2>
+        <label class="agent-row">
+          <span>
+            <strong>Claude Code</strong>
+            <small>CLI + compatible desktop builds</small>
+          </span>
+          <input id="agent-claude" type="checkbox">
+        </label>
+        <label class="agent-row">
+          <span>
+            <strong>Codex</strong>
+            <small>CLI + desktop app</small>
+          </span>
+          <input id="agent-codex" type="checkbox">
+        </label>
+      </section>
+
+      <footer class="footer">
+        <button id="return" class="secondary-button" type="button" disabled>
+          Close feed and return
+        </button>
+        <span class="shortcut">Shortcut <kbd>⌃</kbd><kbd>⇧</kbd><kbd>B</kbd></span>
+      </footer>
+    </main>
+
+    <script type="module" src="panel.mjs"></script>
+  </body>
+</html>

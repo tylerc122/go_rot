@@ -1,0 +1,22 @@
+{
+  "name": "firsttok",
+  "version": "0.1.0",
+  "description": "Open a real short-form feed while Codex works, then return when attention is needed.",
+  "author": {
+    "name": "FirstTok contributors"
+  },
+  "interface": {
+    "displayName": "FirstTok",
+    "shortDescription": "Scroll while Codex works.",
+    "longDescription": "FirstTok reports Codex lifecycle events to its local companion so a real short-form feed can open during waits and close when Codex needs you.",
+    "developerName": "FirstTok contributors",
+    "category": "Productivity",
+    "capabilities": [
+      "Hooks"
+    ],
+    "defaultPrompt": [
+      "Check that FirstTok is connected."
+    ],
+    "brandColor": "#F04E30"
+  }
+}

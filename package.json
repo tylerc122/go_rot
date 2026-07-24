@@ -1,0 +1,19 @@
+{
+  "name": "firsttok",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Take a real short-form video break while Claude Code or Codex works.",
+  "scripts": {
+    "install:mvp": "node scripts/install.mjs install --all",
+    "uninstall:mvp": "node scripts/install.mjs uninstall --all",
+    "doctor": "node scripts/doctor.mjs",
+    "benchmark:hook": "node scripts/benchmark-hook.mjs",
+    "validate:extension": "node scripts/validate-extension.mjs",
+    "test": "node --test",
+    "test:watch": "node --test --watch"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FIRSTTOK_HOOK=1 \"$PLUGIN_ROOT/scripts/run-hook\"",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FIRSTTOK_HOOK=1 \"$PLUGIN_ROOT/scripts/run-hook\"",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FIRSTTOK_HOOK=1 \"$PLUGIN_ROOT/scripts/run-hook\"",
+            "timeout": 2
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "FIRSTTOK_HOOK=1 \"$PLUGIN_ROOT/scripts/run-hook\"",
+            "timeout": 2
+          }
+        ]
+      }
+    ]
+  }
+}

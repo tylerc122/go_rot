@@ -1,0 +1,26 @@
+#!/bin/sh
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+
+if [ -n "$FIRSTTOK_NODE" ] && [ -x "$FIRSTTOK_NODE" ]; then
+  exec "$FIRSTTOK_NODE" "$SCRIPT_DIR/hook-client.mjs"
+fi
+
+if [ -n "$CODEX_CLI_PATH" ]; then
+  CODEX_RESOURCES="$(CDPATH= cd -- "$(dirname -- "$CODEX_CLI_PATH")" && pwd)"
+  CODEX_NODE="$CODEX_RESOURCES/cua_node/bin/node"
+  if [ -x "$CODEX_NODE" ]; then
+    exec "$CODEX_NODE" "$SCRIPT_DIR/hook-client.mjs"
+  fi
+fi
+
+for FIRSTTOK_NODE_CANDIDATE in \
+  /opt/homebrew/bin/node \
+  /usr/local/bin/node \
+  /usr/bin/node
+do
+  if [ -x "$FIRSTTOK_NODE_CANDIDATE" ]; then
+    exec "$FIRSTTOK_NODE_CANDIDATE" "$SCRIPT_DIR/hook-client.mjs"
+  fi
+done
+
+exec /usr/bin/env node "$SCRIPT_DIR/hook-client.mjs"
