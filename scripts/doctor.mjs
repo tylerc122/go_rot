@@ -3,50 +3,82 @@
 import crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import http from "node:http";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { NATIVE_HOST_NAME, socketPath } from "../companion/constants.mjs";
+import {
+  claudeOtelEnvironment,
+  readClaudeOtelConfig
+} from "../companion/claude-otel-config.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const surface = parseSurface(process.argv.slice(2));
 const home = process.env.FIRSTTOK_HOME
   ? path.resolve(process.env.FIRSTTOK_HOME)
   : os.homedir();
 const checks = [];
 const nativeManifest = readJson(nativeManifestPath());
 const installedLauncher = nativeManifest?.path;
+const claudeOtelConfig = readClaudeOtelConfig(home);
 
 check("Node.js 20+", Number(process.versions.node.split(".")[0]) >= 20);
 check("Chrome extension manifest", fs.existsSync(path.join(root, "extension", "manifest.json")));
-check(
-  "Codex plugin bundle",
-  fs.existsSync(
-    path.join(root, "integrations", "firsttok", "hooks", "hooks.json")
-  )
-);
+if (surface !== "claude") {
+  check(
+    "Codex plugin bundle",
+    fs.existsSync(
+      path.join(root, "integrations", "firsttok", "hooks", "hooks.json")
+    )
+  );
+}
 check("Chrome native host manifest", nativeManifestIsValid(nativeManifest));
 check("Chrome-safe native host launcher", nativeLauncherIsValid(installedLauncher));
-check(
-  "Codex hook config + runtime",
-  hookConfigIsValid(path.join(home, ".codex", "hooks.json"))
-);
-check(
-  "Claude Code hook config + runtime",
-  hookConfigIsValid(path.join(home, ".claude", "settings.json"))
-);
-const codexCli = findCodexCli();
-check("Codex CLI for hook approval", Boolean(codexCli), true);
+if (surface !== "claude") {
+  check(
+    "Codex hook config + runtime",
+    hookConfigIsValid(path.join(home, ".codex", "hooks.json"))
+  );
+}
+if (surface !== "codex") {
+  const claudeSettingsPath = path.join(home, ".claude", "settings.json");
+  check(
+    "Claude Code hook config + runtime",
+    hookConfigIsValid(claudeSettingsPath)
+  );
+  check(
+    "Claude native permission tracking",
+    claudeDecisionEnvironmentIsValid(
+      readJson(claudeSettingsPath),
+      claudeOtelConfig
+    )
+  );
+}
+const codexCli = surface === "claude" ? null : findCodexCli();
+if (surface !== "claude") {
+  check("Codex CLI for hook approval", Boolean(codexCli), true);
+}
 check("Companion connection", await socketIsReachable(), true);
+if (surface !== "codex") {
+  check(
+    "Claude decision receiver",
+    await claudeDecisionReceiverIsReachable(claudeOtelConfig),
+    true
+  );
+}
 
 console.log(`\nExtension directory: ${path.join(root, "extension")}`);
 console.log(`Extension ID: ${extensionId()}`);
-console.log("\nACTION  Codex hook approval cannot be checked automatically.");
-console.log(
-  codexCli
-    ? `        Run ${shellQuote(codexCli)}, enter "/hooks", and trust FirstTok.`
-    : '        Start Codex CLI, enter "/hooks", and trust the FirstTok hooks.'
-);
+if (surface !== "claude") {
+  console.log("\nACTION  Codex hook approval cannot be checked automatically.");
+  console.log(
+    codexCli
+      ? `        Run ${shellQuote(codexCli)}, enter "/hooks", and trust FirstTok.`
+      : '        Start Codex CLI, enter "/hooks", and trust the FirstTok hooks.'
+  );
+}
 if (!checks.find((item) => item.label === "Companion connection")?.ok) {
   console.log(
     '\nNEXT    Open chrome://extensions, reload FirstTok, then open its toolbar button.\n' +
@@ -56,6 +88,19 @@ if (!checks.find((item) => item.label === "Companion connection")?.ok) {
 
 if (checks.some((item) => !item.ok && !item.optional)) {
   process.exitCode = 1;
+}
+
+function parseSurface(args) {
+  if (args.length === 0) return "all";
+  if (
+    args.length === 2 &&
+    args[0] === "--surface" &&
+    ["claude", "codex"].includes(args[1])
+  ) {
+    return args[1];
+  }
+  console.error("Usage: node scripts/doctor.mjs [--surface claude|codex]");
+  process.exit(1);
 }
 
 function check(label, ok, optional = false) {
@@ -71,11 +116,20 @@ function hookConfigIsValid(filePath) {
       config.includes("FIRSTTOK_HOOK") &&
       config.includes(process.execPath) &&
       config.includes("PostToolUse") &&
+      !config.includes("claude-permission-hook.mjs") &&
       !config.includes("FIRSTTOK_HOOK=1 /usr/bin/env node")
     );
   } catch {
     return false;
   }
+}
+
+function claudeDecisionEnvironmentIsValid(settings, receiverConfig) {
+  if (!settings || !receiverConfig || settings.otelHeadersHelper) return false;
+  const expected = claudeOtelEnvironment(receiverConfig);
+  return Object.entries(expected).every(
+    ([key, value]) => String(settings.env?.[key]) === value
+  );
 }
 
 function findCodexCli() {
@@ -158,6 +212,34 @@ async function socketIsReachable() {
     const timeout = setTimeout(() => finish(false), 250);
     client.once("connect", () => finish(true));
     client.once("error", () => finish(false));
+  });
+}
+
+async function claudeDecisionReceiverIsReachable(config) {
+  if (!config) return false;
+  return await new Promise((resolve) => {
+    const request = http.request(
+      {
+        host: config.host,
+        port: config.port,
+        path: "/health",
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${config.token}`
+        },
+        timeout: 250
+      },
+      (response) => {
+        response.resume();
+        resolve(response.statusCode === 200);
+      }
+    );
+    request.once("timeout", () => {
+      request.destroy();
+      resolve(false);
+    });
+    request.once("error", () => resolve(false));
+    request.end();
   });
 }
 

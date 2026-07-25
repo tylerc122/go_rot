@@ -35,7 +35,15 @@
       </section>
 
       <aside id="ready-notice" class="ready-notice" hidden>
-        <span id="ready-copy"></span>
+        <div class="activity-notice-copy">
+          <span id="ready-copy"></span>
+          <small id="activity-help" hidden>
+            Agent already stopped? Clear this stale activity.
+          </small>
+        </div>
+        <button id="clear-activity" class="text-button" type="button" hidden>
+          Clear stuck
+        </button>
         <button id="clear-ready" class="text-button" type="button">Clear ready</button>
       </aside>
 

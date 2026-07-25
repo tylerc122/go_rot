@@ -276,6 +276,126 @@ test("manual return, window close, shortcut, and single-task Stop close the feed
   assert.equal(removedWindows.at(-1), 106);
 });
 
+test("explicit recovery closes the tracked feed and clears stuck activity", async () => {
+  await events.runtimeMessage.request({ type: "activity.reset" });
+  await lifecycle(work("work.started", "codex", "stale", "one", "Codex"));
+  await waitFor(() => createdWindows.length === 8);
+  await lifecycle({
+    ...work("attention.required", "codex", "stale", "one", "Codex"),
+    reason: "permission"
+  });
+
+  const result = await events.runtimeMessage.request({
+    type: "activity.reset"
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.cleared, 1);
+  assert.equal(result.closedFeed, true);
+  assert.equal(removedWindows.at(-1), 107);
+  assert.ok(
+    postedToNative.some((message) => message.type === "activity.reset")
+  );
+
+  const status = await events.runtimeMessage.request({ type: "status.get" });
+  assert.deepEqual(status.activity, {
+    working: 0,
+    attention: 0,
+    ready: 0
+  });
+  assert.equal(status.feedSession, null);
+});
+
+test("a native Claude decision event resumes the exact parked feed", async () => {
+  await events.runtimeMessage.request({ type: "activity.reset" });
+  await lifecycle(
+    work("work.started", "claude-code", "native-decision", "unknown-turn", "Terminal")
+  );
+  await waitFor(() => createdWindows.length === 9);
+  await lifecycle({
+    ...work(
+      "attention.required",
+      "claude-code",
+      "native-decision",
+      "unknown-turn",
+      "Terminal"
+    ),
+    reason: "permission"
+  });
+
+  const normalBefore = updatedWindows.filter(
+    (update) => update.windowId === 108 && update.state === "normal"
+  ).length;
+  await lifecycle(
+    work(
+      "work.resumed",
+      "claude-code",
+      "native-decision",
+      "unknown-turn",
+      "Terminal"
+    )
+  );
+  assert.equal(
+    updatedWindows.filter(
+      (update) => update.windowId === 108 && update.state === "normal"
+    ).length,
+    normalBefore + 1
+  );
+
+  await lifecycle(
+    work("work.completed", "claude-code", "native-decision", "unknown-turn", "Terminal")
+  );
+  assert.equal(removedWindows.at(-1), 108);
+});
+
+test("a native Claude rejection closes the parked feed", async () => {
+  await events.runtimeMessage.request({ type: "activity.reset" });
+  await lifecycle(
+    work("work.started", "claude-code", "native-reject", "unknown-turn", "Terminal")
+  );
+  await waitFor(() => createdWindows.length === 10);
+  await lifecycle({
+    ...work(
+      "attention.required",
+      "claude-code",
+      "native-reject",
+      "unknown-turn",
+      "Terminal"
+    ),
+    reason: "permission"
+  });
+
+  await lifecycle(
+    work(
+      "work.completed",
+      "claude-code",
+      "native-reject",
+      "unknown-turn",
+      "Terminal"
+    )
+  );
+  assert.equal(removedWindows.at(-1), 109);
+
+  const status = await events.runtimeMessage.request({ type: "status.get" });
+  assert.deepEqual(status.activity, {
+    working: 0,
+    attention: 0,
+    ready: 0
+  });
+  assert.equal(status.feedSession, null);
+
+  await lifecycle(
+    work(
+      "work.started",
+      "claude-code",
+      "native-reject",
+      "unknown-turn",
+      "Terminal"
+    )
+  );
+  await waitFor(() => createdWindows.length === 11);
+  assert.equal(createdWindows.at(-1).id, 110);
+});
+
 function work(type, agent, sessionId, turnId, sourceApp) {
   return {
     type,

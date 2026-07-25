@@ -13,23 +13,29 @@ import {
   socketPath,
   statePath
 } from "./constants.mjs";
+import { readClaudeOtelConfig } from "./claude-otel-config.mjs";
+import { startClaudeOtelReceiver } from "./claude-otel-receiver.mjs";
 import { NativeMessageDecoder, encodeNativeMessage } from "./native-framing.mjs";
 import { normalizeLifecycleEvent } from "./protocol.mjs";
 
 const execFileAsync = promisify(execFile);
 const sessions = new Map();
+const pendingClaudeRejections = new Map();
 const nativeDecoder = new NativeMessageDecoder();
 let extensionConnected = true;
 let server;
+let claudeOtelReceiver = null;
 
 await prepareRuntime();
+await startDecisionReceiver();
 startNativeInput();
 await startSocketServer();
 sendNative({
   type: "companion.ready",
   protocolVersion: PROTOCOL_VERSION,
   host: NATIVE_HOST_NAME,
-  socketPath: socketPath()
+  socketPath: socketPath(),
+  claudeDecisionReceiver: Boolean(claudeOtelReceiver)
 });
 
 process.on("SIGTERM", shutdown);
@@ -103,6 +109,12 @@ async function startSocketServer() {
 
 function recordEvent(event) {
   const key = sessionKey(event);
+  if (
+    event.agent === "claude-code" &&
+    ["work.started", "work.completed", "session.ended"].includes(event.type)
+  ) {
+    pendingClaudeRejections.delete(event.sessionId);
+  }
   if (event.type === "work.started") {
     sessions.set(key, {
       agent: event.agent,
@@ -128,6 +140,13 @@ function recordEvent(event) {
 
 async function handleExtensionMessage(message) {
   if (!message || typeof message !== "object") return;
+
+  if (message.type === "activity.reset") {
+    sessions.clear();
+    pendingClaudeRejections.clear();
+    persistState();
+    return;
+  }
 
   if (
     message.type === "feed.closed" ||
@@ -190,6 +209,87 @@ async function handleExtensionMessage(message) {
       sessions: sessions.size
     });
   }
+}
+
+async function startDecisionReceiver() {
+  const config = readClaudeOtelConfig();
+  if (!config) return;
+  try {
+    claudeOtelReceiver = await startClaudeOtelReceiver({
+      config,
+      onDecision: forwardClaudeDecision,
+      onPrompt: forwardClaudePrompt
+    });
+  } catch {
+    // Claude continues normally. PostToolUse remains the late resume fallback.
+  }
+}
+
+function forwardClaudeDecision(decision) {
+  if (decision.decision === "accept") {
+    pendingClaudeRejections.delete(decision.sessionId);
+  } else {
+    pendingClaudeRejections.set(decision.sessionId, {
+      sequence: decision.sequence,
+      timestamp: decision.timestamp
+    });
+    if (pendingClaudeRejections.size > 128) {
+      pendingClaudeRejections.delete(
+        pendingClaudeRejections.keys().next().value
+      );
+    }
+  }
+  const desktop = decision.serviceName === "claude-code-desktop";
+  const event = normalizeLifecycleEvent({
+    type: decision.decision === "accept" ? "work.resumed" : "work.completed",
+    agent: "claude-code",
+    surface: desktop ? "desktop" : "cli",
+    sessionId: decision.sessionId,
+    turnId: "unknown-turn",
+    sourceApp: desktop ? "Claude" : sourceAppFromTerminal(decision.terminalType),
+    timestamp: decision.timestamp
+  });
+  sendNative({ type: "lifecycle.event", event });
+}
+
+function forwardClaudePrompt(prompt) {
+  const rejection = pendingClaudeRejections.get(prompt.sessionId);
+  if (!rejection || !eventFollows(prompt, rejection)) return;
+  pendingClaudeRejections.delete(prompt.sessionId);
+
+  const desktop = prompt.serviceName === "claude-code-desktop";
+  const event = normalizeLifecycleEvent({
+    type: "work.started",
+    agent: "claude-code",
+    surface: desktop ? "desktop" : "cli",
+    sessionId: prompt.sessionId,
+    turnId: "unknown-turn",
+    sourceApp: desktop ? "Claude" : sourceAppFromTerminal(prompt.terminalType),
+    timestamp: prompt.timestamp
+  });
+  sendNative({ type: "lifecycle.event", event });
+}
+
+function eventFollows(candidate, previous) {
+  try {
+    const candidateSequence = BigInt(candidate.sequence);
+    const previousSequence = BigInt(previous.sequence);
+    return candidateSequence > previousSequence;
+  } catch {
+    return candidate.timestamp >= previous.timestamp;
+  }
+}
+
+function sourceAppFromTerminal(terminalType) {
+  const terminal = String(terminalType ?? "").toLowerCase();
+  if (terminal.includes("iterm")) return "iTerm";
+  if (terminal.includes("warp")) return "Warp";
+  if (terminal.includes("wezterm")) return "WezTerm";
+  if (terminal.includes("ghostty")) return "Ghostty";
+  if (terminal.includes("vscode") || terminal.includes("cursor")) {
+    return "Visual Studio Code";
+  }
+  return "Terminal";
 }
 
 async function focusApplication(applicationName) {
@@ -292,6 +392,7 @@ function cleanupSocket() {
 
 function shutdown() {
   extensionConnected = false;
+  claudeOtelReceiver?.close();
   server?.close();
   cleanupSocket();
   process.exit(0);

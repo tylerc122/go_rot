@@ -7,13 +7,17 @@
   "scripts": {
     "install:mvp": "node scripts/install.mjs install --all",
     "uninstall:mvp": "node scripts/install.mjs uninstall --all",
+    "install:alpha:claude": "node scripts/install.mjs install --native && node scripts/install.mjs install --claude",
+    "uninstall:alpha:claude": "node scripts/install.mjs uninstall --claude && node scripts/install.mjs uninstall --native",
     "doctor": "node scripts/doctor.mjs",
+    "doctor:claude": "node scripts/doctor.mjs --surface claude",
     "package:alpha": "node scripts/package-alpha.mjs",
+    "package:alpha:claude": "node scripts/package-alpha.mjs --surface claude",
     "benchmark:hook": "node scripts/benchmark-hook.mjs",
     "validate:extension": "node scripts/validate-extension.mjs",
     "validate:docs": "node scripts/validate-docs.mjs",
-    "test": "node --test",
-    "test:watch": "node --test --watch"
+    "test": "node --test test/*.test.mjs",
+    "test:watch": "node --test --watch test/*.test.mjs"
   },
   "engines": {
     "node": ">=20"

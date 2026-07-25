@@ -6,14 +6,30 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
-import { NativeMessageDecoder } from "../companion/native-framing.mjs";
+import {
+  NativeMessageDecoder,
+  encodeNativeMessage
+} from "../companion/native-framing.mjs";
+import {
+  claudeOtelConfigPath,
+  createClaudeOtelConfig
+} from "../companion/claude-otel-config.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 test("hook events travel through the local companion to native messaging", async (t) => {
   const runtime = fs.mkdtempSync(path.join(os.tmpdir(), "firsttok-runtime-"));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "firsttok-home-"));
+  const otelConfig = createClaudeOtelConfig(await availablePort());
+  fs.mkdirSync(path.dirname(claudeOtelConfigPath(home)), { recursive: true });
+  fs.writeFileSync(
+    claudeOtelConfigPath(home),
+    `${JSON.stringify(otelConfig)}\n`,
+    { mode: 0o600 }
+  );
   const environment = {
     ...process.env,
+    FIRSTTOK_HOME: home,
     FIRSTTOK_RUNTIME_DIR: runtime,
     FIRSTTOK_SOURCE_APP: "Terminal"
   };
@@ -28,6 +44,11 @@ test("hook events travel through the local companion to native messaging", async
   const messages = [];
   host.stdout.on("data", (chunk) => messages.push(...decoder.push(chunk)));
   await waitFor(() => messages.some((message) => message.type === "companion.ready"));
+  assert.equal(
+    messages.find((message) => message.type === "companion.ready")
+      .claudeDecisionReceiver,
+    true
+  );
   assert.equal(fs.statSync(runtime).mode & 0o777, 0o700);
   assert.equal(
     fs.statSync(path.join(runtime, "companion.sock")).mode & 0o777,
@@ -106,6 +127,188 @@ test("hook events travel through the local companion to native messaging", async
   )[1];
   assert.equal(resumed.event.type, "work.resumed");
   assert.equal("tool_response" in resumed.event, false);
+
+  host.stdin.write(encodeNativeMessage({ type: "activity.reset" }));
+  await waitFor(() => {
+    try {
+      const state = JSON.parse(
+        fs.readFileSync(path.join(runtime, "state.json"), "utf8")
+      );
+      return state.sessions.length === 0;
+    } catch {
+      return false;
+    }
+  });
+
+  const permissionHook = spawn(
+    process.execPath,
+    [
+      path.join(root, "bin", "firsttok-hook.mjs"),
+      "--provider",
+      "claude-code",
+      "--surface",
+      "cli"
+    ],
+    { cwd: root, env: environment, stdio: ["pipe", "pipe", "pipe"] }
+  );
+  const permissionClosed = new Promise((resolve) =>
+    permissionHook.once("close", resolve)
+  );
+  permissionHook.stdin.end(
+    JSON.stringify({
+      hook_event_name: "PermissionRequest",
+      session_id: "permission-session",
+      tool_name: "Bash",
+      tool_input: { command: "private command" }
+    })
+  );
+  await waitFor(() =>
+    messages.some(
+      (message) =>
+        message.type === "lifecycle.event" &&
+        message.event.sessionId === "permission-session" &&
+        message.event.type === "attention.required"
+    )
+  );
+  const permissionExit = await permissionClosed;
+  assert.equal(permissionExit, 0);
+  assert.equal(JSON.stringify(messages).includes("private command"), false);
+  assert.equal(
+    fs.readFileSync(path.join(runtime, "state.json"), "utf8").includes(
+      "private command"
+    ),
+    false
+  );
+
+  const response = await fetch(
+    `http://${otelConfig.host}:${otelConfig.port}/v1/logs`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${otelConfig.token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(
+        claudeDecisionPayload("permission-session", "private command")
+      )
+    }
+  );
+  assert.equal(response.status, 200);
+  await waitFor(() =>
+    messages.some(
+      (message) =>
+        message.type === "lifecycle.event" &&
+        message.event.sessionId === "permission-session" &&
+        message.event.type === "work.resumed"
+    )
+  );
+  const decisionResume = messages.find(
+    (message) =>
+      message.type === "lifecycle.event" &&
+      message.event.sessionId === "permission-session" &&
+      message.event.type === "work.resumed"
+  );
+  assert.deepEqual(decisionResume.event, {
+    protocolVersion: 1,
+    type: "work.resumed",
+    agent: "claude-code",
+    surface: "cli",
+    sessionId: "permission-session",
+    turnId: "unknown-turn",
+    sourceApp: "iTerm",
+    timestamp: Date.parse("2026-07-24T20:00:00.000Z")
+  });
+  assert.equal(JSON.stringify(messages).includes("private command"), false);
+  assert.equal(JSON.stringify(messages).includes("private@example.com"), false);
+
+  const rejectedResponse = await fetch(
+    `http://${otelConfig.host}:${otelConfig.port}/v1/logs`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${otelConfig.token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(
+        claudeDecisionPayload(
+          "rejected-permission-session",
+          "another private command",
+          "reject"
+        )
+      )
+    }
+  );
+  assert.equal(rejectedResponse.status, 200);
+  await waitFor(() =>
+    messages.some(
+      (message) =>
+        message.type === "lifecycle.event" &&
+        message.event.sessionId === "rejected-permission-session" &&
+        message.event.type === "work.completed"
+    )
+  );
+  assert.equal(
+    JSON.stringify(messages).includes("another private command"),
+    false
+  );
+
+  const staleFollowUpResponse = await fetch(
+    `http://${otelConfig.host}:${otelConfig.port}/v1/logs`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${otelConfig.token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(
+        claudeUserPromptPayload(
+          "rejected-permission-session",
+          "older private prompt",
+          "2"
+        )
+      )
+    }
+  );
+  assert.equal(staleFollowUpResponse.status, 200);
+  assert.equal(
+    messages.some(
+      (message) =>
+        message.type === "lifecycle.event" &&
+        message.event.sessionId === "rejected-permission-session" &&
+        message.event.type === "work.started"
+    ),
+    false
+  );
+
+  const followUpResponse = await fetch(
+    `http://${otelConfig.host}:${otelConfig.port}/v1/logs`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${otelConfig.token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(
+        claudeUserPromptPayload(
+          "rejected-permission-session",
+          "private replacement instructions"
+        )
+      )
+    }
+  );
+  assert.equal(followUpResponse.status, 200);
+  await waitFor(() =>
+    messages.some(
+      (message) =>
+        message.type === "lifecycle.event" &&
+        message.event.sessionId === "rejected-permission-session" &&
+        message.event.type === "work.started"
+    )
+  );
+  assert.equal(
+    JSON.stringify(messages).includes("private replacement instructions"),
+    false
+  );
 });
 
 test("the self-contained Codex plugin hook uses the same private transport", async (t) => {
@@ -207,6 +410,106 @@ test("hook failure stays silent, successful, and bounded without a companion", a
   assert.equal(stderr, "");
   assert.ok(elapsed < 250, `hook took ${elapsed.toFixed(1)} ms`);
 });
+
+function claudeDecisionPayload(
+  sessionId,
+  privateCommand,
+  decision = "accept"
+) {
+  const attribute = (key, value) => ({
+    key,
+    value: { stringValue: value }
+  });
+  return {
+    resourceLogs: [
+      {
+        resource: {
+          attributes: [
+            attribute("service.name", "claude-code"),
+            attribute("terminal.type", "iTerm.app"),
+            attribute("user.email", "private@example.com")
+          ]
+        },
+        scopeLogs: [
+          {
+            logRecords: [
+              {
+                attributes: [
+                  attribute("event.name", "tool_decision"),
+                  attribute("event.timestamp", "2026-07-24T20:00:00.000Z"),
+                  attribute("event.sequence", "3"),
+                  attribute("session.id", sessionId),
+                  attribute("tool_use_id", "toolu_transport"),
+                  attribute("decision", decision),
+                  attribute(
+                    "source",
+                    decision === "accept" ? "user_temporary" : "user_reject"
+                  ),
+                  attribute(
+                    "tool_parameters",
+                    JSON.stringify({ full_command: privateCommand })
+                  )
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  };
+}
+
+function claudeUserPromptPayload(sessionId, privatePrompt, sequence = "4") {
+  const attribute = (key, value) => ({
+    key,
+    value: { stringValue: value }
+  });
+  return {
+    resourceLogs: [
+      {
+        resource: {
+          attributes: [
+            attribute("service.name", "claude-code"),
+            attribute("terminal.type", "iTerm.app"),
+            attribute("user.email", "private@example.com")
+          ]
+        },
+        scopeLogs: [
+          {
+            logRecords: [
+              {
+                attributes: [
+                  attribute("event.name", "user_prompt"),
+                  attribute("event.timestamp", "2026-07-24T20:00:01.000Z"),
+                  attribute("event.sequence", sequence),
+                  attribute("session.id", sessionId),
+                  attribute("prompt", privatePrompt)
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  };
+}
+
+async function availablePort() {
+  const net = await import("node:net");
+  return await new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      const port = typeof address === "object" ? address?.port : null;
+      server.close((error) => {
+        if (error) reject(error);
+        else if (Number.isInteger(port)) resolve(port);
+        else reject(new Error("No transport test port was allocated."));
+      });
+    });
+  });
+}
 
 async function waitFor(predicate, timeoutMs = 2500) {
   const deadline = Date.now() + timeoutMs;

@@ -128,6 +128,12 @@ export class SessionRegistry {
     }
   }
 
+  clearAll() {
+    const removed = [...this.#tasks.values()];
+    this.#tasks.clear();
+    return removed;
+  }
+
   tasks() {
     return [...this.#tasks.values()];
   }

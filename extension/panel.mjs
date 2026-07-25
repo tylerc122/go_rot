@@ -8,6 +8,8 @@ const elements = {
   reconnect: document.querySelector("#reconnect"),
   readyNotice: document.querySelector("#ready-notice"),
   readyCopy: document.querySelector("#ready-copy"),
+  activityHelp: document.querySelector("#activity-help"),
+  clearActivity: document.querySelector("#clear-activity"),
   clearReady: document.querySelector("#clear-ready"),
   delay: document.querySelector("#delay"),
   providers: [...document.querySelectorAll('input[name="provider"]')],
@@ -106,6 +108,15 @@ function bindEvents() {
     await send({ type: "background.clear" });
     await refresh();
   });
+
+  elements.clearActivity.addEventListener("click", async () => {
+    elements.clearActivity.disabled = true;
+    elements.clearActivity.textContent = "Clearing…";
+    await send({ type: "activity.reset" });
+    await refresh();
+    elements.clearActivity.disabled = false;
+    elements.clearActivity.textContent = "Clear stuck";
+  });
 }
 
 function updateAgents() {
@@ -168,7 +179,10 @@ function render(next) {
   elements.readyNotice.dataset.tone =
     activity.attention > 0 ? "attention" : activity.working > 0 ? "working" : "ready";
   elements.readyCopy.textContent = activityParts.join(" · ");
-  elements.clearReady.hidden = activity.ready === 0;
+  const hasPendingActivity = activity.working + activity.attention > 0;
+  elements.activityHelp.hidden = !hasPendingActivity;
+  elements.clearActivity.hidden = !hasPendingActivity;
+  elements.clearReady.hidden = hasPendingActivity || activity.ready === 0;
 
   elements.pauseControls.hidden = paused;
   elements.resume.hidden = !paused;

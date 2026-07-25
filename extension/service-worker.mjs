@@ -14,6 +14,7 @@ let nativePort = null;
 let reconnectTimer = null;
 let connectionState = "connecting";
 let lastError = null;
+let lifecycleQueue = Promise.resolve();
 
 connectNative();
 
@@ -118,7 +119,13 @@ async function handleNativeMessage(message) {
     return;
   }
   if (message.type === "lifecycle.event") {
-    await handleLifecycleEvent(message.event);
+    lifecycleQueue = lifecycleQueue
+      .then(() => handleLifecycleEvent(message.event))
+      .catch((error) => {
+        lastError = error.message;
+        broadcastStatus();
+      });
+    await lifecycleQueue;
   }
 }
 
@@ -364,6 +371,28 @@ async function closeFeed(reason) {
   return await finishFeed(reason, feedSession?.anchorEvent);
 }
 
+async function resetActivity() {
+  const tasks = registry.clearAll();
+  const feed = feedSession;
+  const hadTrackedWindow = feed?.windowId !== null && feed?.windowId !== undefined;
+
+  if (feed) {
+    clearFeedTimer(feed);
+    feed.closing = true;
+    if (feed.windowId !== null) {
+      await safeCloseWindow(feed.windowId);
+    }
+    feedSession = null;
+  }
+
+  nativePort?.postMessage({ type: "activity.reset" });
+  await refreshStatus();
+  return {
+    cleared: tasks.length,
+    closedFeed: hadTrackedWindow
+  };
+}
+
 function clearFeedTimer(feed) {
   clearTimeout(feed.timerId);
   feed.timerId = null;
@@ -438,6 +467,9 @@ async function handleUiMessage(message) {
     registry.clearReady();
     await refreshStatus();
     return { ok: true };
+  }
+  if (message?.type === "activity.reset") {
+    return { ok: true, ...(await resetActivity()) };
   }
   if (message?.type === "session.return") {
     return { ok: await closeFeed("manual") };

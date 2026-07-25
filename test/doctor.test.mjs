@@ -26,10 +26,22 @@ test("doctor distinguishes installation, hook approval, and live companion state
     runtime
   );
   assert.match(waiting.stdout, /PASS\s+Chrome-safe native host launcher/);
+  assert.match(waiting.stdout, /PASS\s+Claude native permission tracking/);
   assert.match(waiting.stdout, /WAIT\s+Companion connection/);
+  assert.match(waiting.stdout, /WAIT\s+Claude decision receiver/);
   assert.match(waiting.stdout, /ACTION\s+Codex hook approval/);
   assert.match(waiting.stdout, /enter "\/hooks"/);
   assert.match(waiting.stdout, /NEXT\s+Open chrome:\/\/extensions/);
+
+  const claudeOnly = run(
+    [path.join(root, "scripts", "doctor.mjs"), "--surface", "claude"],
+    target,
+    runtime
+  );
+  assert.match(claudeOnly.stdout, /PASS\s+Claude Code hook config \+ runtime/);
+  assert.match(claudeOnly.stdout, /PASS\s+Claude native permission tracking/);
+  assert.doesNotMatch(claudeOnly.stdout, /Codex hook config/);
+  assert.doesNotMatch(claudeOnly.stdout, /Codex hook approval/);
 
   const host = spawn(
     process.execPath,
@@ -38,6 +50,7 @@ test("doctor distinguishes installation, hook approval, and live companion state
     cwd: root,
     env: {
       ...process.env,
+      FIRSTTOK_HOME: target,
       FIRSTTOK_RUNTIME_DIR: runtime
     },
     stdio: ["pipe", "pipe", "pipe"]
@@ -58,6 +71,7 @@ test("doctor distinguishes installation, hook approval, and live companion state
     runtime
   );
   assert.match(connected.stdout, /PASS\s+Companion connection/);
+  assert.match(connected.stdout, /PASS\s+Claude decision receiver/);
   assert.doesNotMatch(connected.stdout, /NEXT\s+Open chrome:\/\/extensions/);
 });
 

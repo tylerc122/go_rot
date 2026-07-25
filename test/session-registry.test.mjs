@@ -102,3 +102,20 @@ test("cleans an entire provider session even when SessionEnd has no turn id", ()
   assert.equal(removed.length, 2);
   assert.equal(registry.pendingCount(), 0);
 });
+
+test("clears every task for explicit stale-activity recovery", () => {
+  const registry = new SessionRegistry();
+  registry.start("working", task("codex", "session-1", "turn-1"));
+  registry.requireAttention("attention", {
+    ...task("claude-code", "session-2", "turn-2").event,
+    reason: "permission"
+  });
+
+  const removed = registry.clearAll();
+  assert.equal(removed.length, 2);
+  assert.deepEqual(registry.counts(), {
+    working: 0,
+    attention: 0,
+    ready: 0
+  });
+});
