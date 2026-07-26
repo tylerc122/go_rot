@@ -742,7 +742,7 @@ function finishVisibleClip() {
   const cancelEvent = "firsttok:cancel-finish-clip";
   document.getElementById(overlayId)?.remove();
 
-  const video = findVisiblePlayingVideo();
+  let video = findVisiblePlayingVideo();
 
   if (!video || video.duration - video.currentTime <= 0.25) {
     return { reason: "no-playing-video" };
@@ -822,7 +822,6 @@ function finishVisibleClip() {
     shadow.append(style, notice);
     document.documentElement.append(host);
 
-    const initialPageUrl = location.href;
     const initialSourceUrl = video.currentSrc;
     let previousTime = video.currentTime;
     let settled = false;
@@ -832,9 +831,7 @@ function finishVisibleClip() {
       if (settled) return;
       settled = true;
       clearInterval(identityTimerId);
-      video.removeEventListener("ended", onEnded);
-      video.removeEventListener("timeupdate", onTimeUpdate);
-      video.removeEventListener("loadstart", onClipIdentityCheck);
+      stopWatchingVideo(video);
       document.removeEventListener(cancelEvent, onCancel);
       host.remove();
       resolve({ reason });
@@ -856,25 +853,43 @@ function finishVisibleClip() {
       previousTime = currentTime;
     };
     const onClipIdentityCheck = () => {
-      if (!video.isConnected || location.href !== initialPageUrl) {
-        finish("clip-changed");
-        return;
-      }
-
       const currentSourceUrl = video.currentSrc;
       if (
         initialSourceUrl &&
         currentSourceUrl &&
         currentSourceUrl !== initialSourceUrl
       ) {
-        finish("clip-changed");
+        finish("media-source-changed");
         return;
       }
 
       const visiblePlayingVideo = findVisiblePlayingVideo();
       if (visiblePlayingVideo && visiblePlayingVideo !== video) {
-        finish("clip-changed");
+        const visibleSourceUrl = visiblePlayingVideo.currentSrc;
+        if (
+          initialSourceUrl &&
+          visibleSourceUrl &&
+          visibleSourceUrl !== initialSourceUrl
+        ) {
+          finish("visible-video-changed");
+          return;
+        }
+
+        stopWatchingVideo(video);
+        video = visiblePlayingVideo;
+        previousTime = video.currentTime;
+        watchVideo(video);
       }
+    };
+    const watchVideo = (candidate) => {
+      candidate.addEventListener("ended", onEnded, { once: true });
+      candidate.addEventListener("timeupdate", onTimeUpdate);
+      candidate.addEventListener("loadstart", onClipIdentityCheck);
+    };
+    const stopWatchingVideo = (candidate) => {
+      candidate.removeEventListener("ended", onEnded);
+      candidate.removeEventListener("timeupdate", onTimeUpdate);
+      candidate.removeEventListener("loadstart", onClipIdentityCheck);
     };
     const onCancel = () => finish("cancelled");
 
@@ -883,9 +898,7 @@ function finishVisibleClip() {
       event.stopPropagation();
       finish("return-now");
     });
-    video.addEventListener("ended", onEnded, { once: true });
-    video.addEventListener("timeupdate", onTimeUpdate);
-    video.addEventListener("loadstart", onClipIdentityCheck);
+    watchVideo(video);
     document.addEventListener(cancelEvent, onCancel, { once: true });
     identityTimerId = setInterval(onClipIdentityCheck, 100);
   });

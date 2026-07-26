@@ -553,7 +553,7 @@ test("new work cancels a pending clip finish and keeps the feed open", async () 
   settings.finishCurrentClip = false;
 });
 
-test("clip finishing closes when a different visible video starts", async () => {
+test("clip finishing ignores comment state and closes on a new video", async () => {
   assert.ok(finishVisibleClipFunction);
   const page = installFinishClipPage();
 
@@ -563,6 +563,10 @@ test("clip finishing closes when a different visible video starts", async () => 
     resultPromise.then(() => {
       settled = true;
     });
+
+    page.location.href = "https://example.com/comments/current";
+    await new Promise((resolve) => setTimeout(resolve, 125));
+    assert.equal(settled, false);
 
     page.current.paused = true;
     await new Promise((resolve) => setTimeout(resolve, 125));
@@ -579,7 +583,33 @@ test("clip finishing closes when a different visible video starts", async () => 
         );
       })
     ]).finally(() => clearTimeout(timeoutId));
-    assert.deepEqual(result, { reason: "clip-changed" });
+    assert.deepEqual(result, { reason: "visible-video-changed" });
+  } finally {
+    page.restore();
+  }
+});
+
+test("clip finishing follows a same-clip player rebuild", async () => {
+  assert.ok(finishVisibleClipFunction);
+  const page = installFinishClipPage();
+  page.next.currentSrc = page.current.currentSrc;
+
+  try {
+    const resultPromise = finishVisibleClipFunction();
+    let settled = false;
+    resultPromise.then(() => {
+      settled = true;
+    });
+
+    page.current.paused = true;
+    page.current.isConnected = false;
+    page.next.paused = false;
+    await new Promise((resolve) => setTimeout(resolve, 125));
+    assert.equal(settled, false);
+
+    page.next.currentTime = page.next.duration;
+    page.next.dispatchEvent(new Event("timeupdate"));
+    assert.deepEqual(await resultPromise, { reason: "ended" });
   } finally {
     page.restore();
   }
@@ -685,6 +715,7 @@ function installFinishClipPage() {
   const next = new FakeVideo("https://media.example/next.mp4");
   current.paused = false;
   const videos = [current, next];
+  const fakeLocation = { href: "https://example.com/reel/current" };
   const documentEvents = new EventTarget();
   let overlay = null;
   const fakeDocument = {
@@ -709,7 +740,7 @@ function installFinishClipPage() {
 
   const replacements = {
     document: fakeDocument,
-    location: { href: "https://example.com/reel/current" },
+    location: fakeLocation,
     innerWidth: 1000,
     innerHeight: 1000,
     getComputedStyle() {
@@ -729,6 +760,7 @@ function installFinishClipPage() {
   return {
     current,
     next,
+    location: fakeLocation,
     restore() {
       for (const [name, descriptor] of descriptors) {
         if (descriptor) {
