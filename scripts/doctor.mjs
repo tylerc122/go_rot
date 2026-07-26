@@ -23,6 +23,7 @@ const checks = [];
 const nativeManifest = readJson(nativeManifestPath());
 const installedLauncher = nativeManifest?.path;
 const claudeOtelConfig = readClaudeOtelConfig(home);
+const claudeCli = surface === "codex" ? null : findClaudeCli();
 
 check("Node.js 20+", Number(process.versions.node.split(".")[0]) >= 20);
 check("Chrome extension manifest", fs.existsSync(path.join(root, "extension", "manifest.json")));
@@ -43,6 +44,11 @@ if (surface !== "claude") {
   );
 }
 if (surface !== "codex") {
+  check(
+    "Claude replacement signal (2.1.220+)",
+    claudeVersionIsCompatible(claudeCli),
+    true
+  );
   const claudeSettingsPath = path.join(home, ".claude", "settings.json");
   check(
     "Claude Code hook config + runtime",
@@ -151,6 +157,48 @@ function findCodexCli() {
       return false;
     }
   });
+}
+
+function findClaudeCli() {
+  const candidates = [
+    process.env.CLAUDE_CLI_PATH,
+    ...String(process.env.PATH ?? "")
+      .split(path.delimiter)
+      .filter(Boolean)
+      .map((directory) => path.join(directory, "claude"))
+  ];
+  return candidates.find((candidate) => {
+    if (!candidate) return false;
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+}
+
+function claudeVersionIsCompatible(cliPath) {
+  if (!cliPath) return false;
+  try {
+    const result = spawnSync(cliPath, ["--version"], {
+      encoding: "utf8",
+      timeout: 2_000
+    });
+    if (result.status !== 0) return false;
+    const match = result.stdout.match(/\b(\d+)\.(\d+)\.(\d+)\b/);
+    if (!match) return false;
+    const version = match.slice(1).map(Number);
+    const minimum = [2, 1, 220];
+    for (let index = 0; index < minimum.length; index += 1) {
+      if (version[index] !== minimum[index]) {
+        return version[index] > minimum[index];
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function readJson(filePath) {

@@ -309,6 +309,196 @@ test("hook events travel through the local companion to native messaging", async
     JSON.stringify(messages).includes("private replacement instructions"),
     false
   );
+
+  const hookReplacementSession = "hook-replacement-session";
+  const hookRejectedResponse = await fetch(
+    `http://${otelConfig.host}:${otelConfig.port}/v1/logs`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${otelConfig.token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(
+        claudeDecisionPayload(
+          hookReplacementSession,
+          "private rejected command",
+          "reject",
+          new Date(Date.now() - 1_000).toISOString()
+        )
+      )
+    }
+  );
+  assert.equal(hookRejectedResponse.status, 200);
+  await waitFor(() =>
+    messages.some(
+      (message) =>
+        message.type === "lifecycle.event" &&
+        message.event.sessionId === hookReplacementSession &&
+        message.event.type === "work.completed"
+    )
+  );
+
+  await sendClaudeHook(environment, {
+    hook_event_name: "UserPromptSubmit",
+    session_id: hookReplacementSession,
+    prompt: "private inline replacement"
+  });
+  await waitFor(() =>
+    messages.some(
+      (message) =>
+        message.type === "lifecycle.event" &&
+        message.event.sessionId === hookReplacementSession &&
+        message.event.type === "work.started"
+    )
+  );
+
+  const promptAfterHookResponse = await fetch(
+    `http://${otelConfig.host}:${otelConfig.port}/v1/logs`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${otelConfig.token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(
+        claudeUserPromptPayload(
+          hookReplacementSession,
+          "private inline replacement",
+          "4"
+        )
+      )
+    }
+  );
+  assert.equal(promptAfterHookResponse.status, 200);
+  assert.equal(
+    messages.filter(
+      (message) =>
+        message.type === "lifecycle.event" &&
+        message.event.sessionId === hookReplacementSession &&
+        message.event.type === "work.started"
+    ).length,
+    1
+  );
+
+  const delayedDecisionSession = "delayed-decision-session";
+  await sendClaudeHook(environment, {
+    hook_event_name: "UserPromptSubmit",
+    session_id: delayedDecisionSession,
+    prompt: "private replacement that beat the exporter"
+  });
+  await waitFor(() =>
+    messages.some(
+      (message) =>
+        message.type === "lifecycle.event" &&
+        message.event.sessionId === delayedDecisionSession &&
+        message.event.type === "work.started"
+    )
+  );
+
+  const delayedRejectionResponse = await fetch(
+    `http://${otelConfig.host}:${otelConfig.port}/v1/logs`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${otelConfig.token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(
+        claudeDecisionPayload(
+          delayedDecisionSession,
+          "private delayed command",
+          "reject",
+          new Date(Date.now() - 1_000).toISOString()
+        )
+      )
+    }
+  );
+  assert.equal(delayedRejectionResponse.status, 200);
+  await waitFor(
+    () =>
+      messages.filter(
+        (message) =>
+          message.type === "lifecycle.event" &&
+          message.event.sessionId === delayedDecisionSession
+      ).length === 3
+  );
+  assert.deepEqual(
+    messages
+      .filter(
+        (message) =>
+          message.type === "lifecycle.event" &&
+          message.event.sessionId === delayedDecisionSession
+      )
+      .map((message) => message.event.type),
+    ["work.started", "work.completed", "work.started"]
+  );
+
+  const apiReplacementSession = "api-replacement-session";
+  const apiReplacementResponse = await fetch(
+    `http://${otelConfig.host}:${otelConfig.port}/v1/logs`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${otelConfig.token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(
+        claudeReplacementBatchPayload(
+          apiReplacementSession,
+          "private replacement request"
+        )
+      )
+    }
+  );
+  assert.equal(apiReplacementResponse.status, 200);
+  await waitFor(
+    () =>
+      messages.filter(
+        (message) =>
+          message.type === "lifecycle.event" &&
+          message.event.sessionId === apiReplacementSession
+      ).length === 2
+  );
+  assert.deepEqual(
+    messages
+      .filter(
+        (message) =>
+          message.type === "lifecycle.event" &&
+          message.event.sessionId === apiReplacementSession
+      )
+      .map((message) => message.event.type),
+    ["work.completed", "work.started"]
+  );
+  assert.equal(JSON.stringify(messages).includes("private inline replacement"), false);
+  assert.equal(
+    JSON.stringify(messages).includes("private replacement that beat the exporter"),
+    false
+  );
+  const diagnosticState = JSON.parse(
+    fs.readFileSync(path.join(runtime, "state.json"), "utf8")
+  );
+  assert.ok(
+    diagnosticState.recentLifecycle.some(
+      (event) =>
+        event.source === "decision" && event.type === "work.completed"
+    )
+  );
+  assert.ok(
+    diagnosticState.recentLifecycle.some(
+      (event) => event.source === "replay" && event.type === "work.started"
+    )
+  );
+  assert.ok(
+    diagnosticState.recentLifecycle.some(
+      (event) =>
+        event.source === "monitoring" &&
+        event.type === "otel.tool_decision" &&
+        event.sequence === "3" &&
+        /^[a-f0-9]{12}$/.test(event.prompt)
+    )
+  );
+  assert.equal(JSON.stringify(diagnosticState).includes("private"), false);
 });
 
 test("the self-contained Codex plugin hook uses the same private transport", async (t) => {
@@ -414,7 +604,8 @@ test("hook failure stays silent, successful, and bounded without a companion", a
 function claudeDecisionPayload(
   sessionId,
   privateCommand,
-  decision = "accept"
+  decision = "accept",
+  timestamp = "2026-07-24T20:00:00.000Z"
 ) {
   const attribute = (key, value) => ({
     key,
@@ -436,9 +627,10 @@ function claudeDecisionPayload(
               {
                 attributes: [
                   attribute("event.name", "tool_decision"),
-                  attribute("event.timestamp", "2026-07-24T20:00:00.000Z"),
+                  attribute("event.timestamp", timestamp),
                   attribute("event.sequence", "3"),
                   attribute("session.id", sessionId),
+                  attribute("prompt.id", `prompt-${sessionId}`),
                   attribute("tool_use_id", "toolu_transport"),
                   attribute("decision", decision),
                   attribute(
@@ -457,6 +649,47 @@ function claudeDecisionPayload(
       }
     ]
   };
+}
+
+function claudeReplacementBatchPayload(sessionId, privateRequest) {
+  const payload = claudeDecisionPayload(
+    sessionId,
+    "private rejected command",
+    "reject"
+  );
+  const attribute = (key, value) => ({
+    key,
+    value: { stringValue: value }
+  });
+  payload.resourceLogs[0].scopeLogs[0].logRecords.push({
+    attributes: [
+      attribute("event.name", "api_request"),
+      attribute("event.timestamp", "2026-07-24T20:00:01.000Z"),
+      attribute("event.sequence", "4"),
+      attribute("session.id", sessionId),
+      attribute("prompt.id", `prompt-${sessionId}`),
+      attribute("query_source", "repl_main_thread"),
+      attribute("request_body", privateRequest)
+    ]
+  });
+  return payload;
+}
+
+async function sendClaudeHook(environment, input) {
+  const hook = spawn(
+    process.execPath,
+    [
+      path.join(root, "bin", "firsttok-hook.mjs"),
+      "--provider",
+      "claude-code",
+      "--surface",
+      "cli"
+    ],
+    { cwd: root, env: environment, stdio: ["pipe", "pipe", "pipe"] }
+  );
+  hook.stdin.end(JSON.stringify(input));
+  const code = await new Promise((resolve) => hook.once("close", resolve));
+  assert.equal(code, 0);
 }
 
 function claudeUserPromptPayload(sessionId, privatePrompt, sequence = "4") {

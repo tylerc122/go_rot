@@ -14,6 +14,11 @@ test("doctor distinguishes installation, hook approval, and live companion state
   const runtime = fs.mkdtempSync(
     path.join(os.tmpdir(), "firsttok-doctor-runtime-")
   );
+  fs.writeFileSync(
+    path.join(target, "claude"),
+    "#!/bin/sh\nprintf '2.1.220 (Claude Code)\\n'\n",
+    { mode: 0o700 }
+  );
   run(
     [path.join(root, "scripts", "install.mjs"), "install", "--all"],
     target,
@@ -27,6 +32,7 @@ test("doctor distinguishes installation, hook approval, and live companion state
   );
   assert.match(waiting.stdout, /PASS\s+Chrome-safe native host launcher/);
   assert.match(waiting.stdout, /PASS\s+Claude native permission tracking/);
+  assert.match(waiting.stdout, /PASS\s+Claude replacement signal \(2\.1\.220\+\)/);
   assert.match(waiting.stdout, /WAIT\s+Companion connection/);
   assert.match(waiting.stdout, /WAIT\s+Claude decision receiver/);
   assert.match(waiting.stdout, /ACTION\s+Codex hook approval/);
@@ -81,7 +87,8 @@ function run(args, home, runtime) {
     env: {
       ...process.env,
       FIRSTTOK_HOME: home,
-      FIRSTTOK_RUNTIME_DIR: runtime
+      FIRSTTOK_RUNTIME_DIR: runtime,
+      CLAUDE_CLI_PATH: path.join(home, "claude")
     },
     encoding: "utf8"
   });

@@ -14,6 +14,7 @@ export async function startClaudeOtelReceiver({
   config,
   onDecision,
   onPrompt = () => {},
+  onEvent = () => {},
   maximumBytes = MAX_MESSAGE_BYTES
 }) {
   const normalized = normalizeClaudeOtelConfig(config);
@@ -22,6 +23,18 @@ export async function startClaudeOtelReceiver({
     handleRequest(request, response, {
       config: normalized,
       maximumBytes,
+      onEvent(event) {
+        const key = [
+          "event",
+          event.sessionId,
+          event.sequence,
+          event.eventName
+        ].join(":");
+        if (seen.has(key)) return;
+        onEvent(event);
+        seen.add(key);
+        if (seen.size > 512) seen.delete(seen.values().next().value);
+      },
       onDecision(decision) {
         const key = [
           decision.sessionId,
@@ -66,6 +79,39 @@ export async function startClaudeOtelReceiver({
   };
 }
 
+export function extractClaudeEventSummaries(payload) {
+  const events = [];
+  for (const resourceLog of array(payload?.resourceLogs)) {
+    const resourceAttributes = attributesToObject(
+      resourceLog?.resource?.attributes
+    );
+    for (const scopeLog of array(resourceLog?.scopeLogs)) {
+      for (const record of array(scopeLog?.logRecords)) {
+        const attributes = {
+          ...resourceAttributes,
+          ...attributesToObject(record?.attributes)
+        };
+        const eventName =
+          stringValue(attributes["event.name"]) ??
+          stringValue(record?.body?.stringValue);
+        const sessionId = stringValue(attributes["session.id"]);
+        if (!eventName || !sessionId) continue;
+        events.push({
+          eventName,
+          sessionId,
+          sequence: stringValue(attributes["event.sequence"]) ?? "unknown",
+          promptId: stringValue(attributes["prompt.id"]),
+          querySource: querySourceCategory(
+            stringValue(attributes.query_source)
+          ),
+          timestamp: eventTimestamp(attributes, record)
+        });
+      }
+    }
+  }
+  return events;
+}
+
 export function extractClaudeToolDecisions(payload) {
   const decisions = [];
   for (const resourceLog of array(payload?.resourceLogs)) {
@@ -105,6 +151,7 @@ export function extractClaudeToolDecisions(payload) {
           source,
           toolUseId: stringValue(attributes.tool_use_id) ?? "unknown-tool",
           sequence: stringValue(attributes["event.sequence"]) ?? "unknown",
+          promptId: stringValue(attributes["prompt.id"]),
           serviceName: stringValue(attributes["service.name"]) ?? "claude-code",
           terminalType: stringValue(attributes["terminal.type"]),
           timestamp: eventTimestamp(attributes, record)
@@ -187,6 +234,9 @@ async function handleRequest(request, response, options) {
     for (const prompt of extractClaudeUserPrompts(payload)) {
       options.onPrompt(prompt);
     }
+    for (const event of extractClaudeEventSummaries(payload)) {
+      options.onEvent(event);
+    }
     response.setHeader("Content-Type", "application/json");
     response.writeHead(200).end("{}\n");
   } catch (error) {
@@ -231,6 +281,13 @@ function readBody(request, maximumBytes) {
 
 function drain(request) {
   request.resume();
+}
+
+function querySourceCategory(value) {
+  if (!value) return null;
+  if (value === "repl_main_thread" || value === "main") return "main";
+  if (value === "compact") return "compact";
+  return "other";
 }
 
 function attributesToObject(attributes) {

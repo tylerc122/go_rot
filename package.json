@@ -11,6 +11,8 @@
     "uninstall:alpha:claude": "node scripts/install.mjs uninstall --claude && node scripts/install.mjs uninstall --native",
     "doctor": "node scripts/doctor.mjs",
     "doctor:claude": "node scripts/doctor.mjs --surface claude",
+    "capture:claude": "node scripts/capture-claude-events.mjs",
+    "trace:claude": "node scripts/claude-trace.mjs",
     "package:alpha": "node scripts/package-alpha.mjs",
     "package:alpha:claude": "node scripts/package-alpha.mjs --surface claude",
     "benchmark:hook": "node scripts/benchmark-hook.mjs",

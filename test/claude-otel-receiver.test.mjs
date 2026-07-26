@@ -6,6 +6,7 @@ import {
   createClaudeOtelConfig
 } from "../companion/claude-otel-config.mjs";
 import {
+  extractClaudeEventSummaries,
   extractClaudeUserPrompts,
   extractClaudeToolDecisions,
   startClaudeOtelReceiver
@@ -47,6 +48,7 @@ test("extracts only documented Claude tool-decision fields", () => {
       source: "user_temporary",
       toolUseId: "toolu_123",
       sequence: "7",
+      promptId: "prompt-diagnostic",
       serviceName: "claude-code",
       terminalType: "iTerm.app",
       timestamp: Date.parse("2026-07-24T20:00:00.000Z")
@@ -75,6 +77,52 @@ test("extracts a content-free user prompt lifecycle signal", () => {
   ]);
   assert.equal(JSON.stringify(prompts).includes("do this instead"), false);
   assert.equal(JSON.stringify(prompts).includes("user@example.com"), false);
+});
+
+test("extracts only content-free event ordering for diagnostics", () => {
+  const payload = decisionPayload({
+    sessionId: "session-diagnostic",
+    source: "user_reject",
+    decision: "reject",
+    privatePrompt: "do this other private thing",
+    privateCommand: "private command"
+  });
+
+  assert.deepEqual(extractClaudeEventSummaries(payload), [
+    {
+      eventName: "tool_decision",
+      sessionId: "session-diagnostic",
+      sequence: "7",
+      promptId: "prompt-diagnostic",
+      querySource: null,
+      timestamp: Date.parse("2026-07-24T20:00:00.000Z")
+    }
+  ]);
+  const serialized = JSON.stringify(extractClaudeEventSummaries(payload));
+  assert.equal(serialized.includes("do this other private thing"), false);
+  assert.equal(serialized.includes("private command"), false);
+  assert.equal(serialized.includes("user@example.com"), false);
+});
+
+test("classifies main-thread API requests without retaining request content", () => {
+  const events = extractClaudeEventSummaries(
+    apiRequestPayload({
+      sessionId: "session-replacement",
+      privateRequest: "never retain this request"
+    })
+  );
+
+  assert.deepEqual(events, [
+    {
+      eventName: "api_request",
+      sessionId: "session-replacement",
+      sequence: "9",
+      promptId: "prompt-replacement",
+      querySource: "main",
+      timestamp: Date.parse("2026-07-24T20:00:02.000Z")
+    }
+  ]);
+  assert.equal(JSON.stringify(events).includes("never retain"), false);
 });
 
 test("ignores non-decision, malformed, and non-user decision records", () => {
@@ -118,11 +166,13 @@ test("accepts authenticated OTLP JSON, rejects outsiders, and deduplicates retri
   const config = createClaudeOtelConfig(await availablePort());
   const decisions = [];
   const prompts = [];
+  const events = [];
   const receiver = await startClaudeOtelReceiver({
     config,
     maximumBytes: 32_000,
     onDecision: (decision) => decisions.push(decision),
-    onPrompt: (prompt) => prompts.push(prompt)
+    onPrompt: (prompt) => prompts.push(prompt),
+    onEvent: (event) => events.push(event)
   });
   t.after(() => receiver.close());
 
@@ -140,6 +190,7 @@ test("accepts authenticated OTLP JSON, rejects outsiders, and deduplicates retri
   assert.equal(first.status, 200);
   assert.equal(retry.status, 200);
   assert.equal(decisions.length, 1);
+  assert.equal(events.length, 1);
   assert.equal(decisions[0].sessionId, "session-http");
 
   const promptPayload = userPromptPayload({ sessionId: "prompt-http" });
@@ -156,6 +207,7 @@ test("accepts authenticated OTLP JSON, rejects outsiders, and deduplicates retri
   assert.equal(promptFirst.status, 200);
   assert.equal(promptRetry.status, 200);
   assert.equal(prompts.length, 1);
+  assert.equal(events.length, 2);
   assert.equal(prompts[0].sessionId, "prompt-http");
 
   const health = await fetch(`${receiver.address}/health`, {
@@ -208,6 +260,7 @@ function decisionPayload({
     attribute("event.timestamp", "2026-07-24T20:00:00.000Z"),
     attribute("event.sequence", "7"),
     attribute("session.id", sessionId),
+    attribute("prompt.id", "prompt-diagnostic"),
     attribute("tool_name", "Bash"),
     attribute("tool_use_id", "toolu_123"),
     attribute("decision", decision),
@@ -263,6 +316,41 @@ function userPromptPayload({
                   attribute("session.id", sessionId),
                   attribute("prompt", privatePrompt),
                   attribute("prompt_length", String(privatePrompt.length))
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  };
+}
+
+function apiRequestPayload({
+  sessionId = "session",
+  privateRequest = "<REDACTED>"
+} = {}) {
+  return {
+    resourceLogs: [
+      {
+        resource: {
+          attributes: [attribute("service.name", "claude-code")]
+        },
+        scopeLogs: [
+          {
+            logRecords: [
+              {
+                attributes: [
+                  attribute("event.name", "api_request"),
+                  attribute(
+                    "event.timestamp",
+                    "2026-07-24T20:00:02.000Z"
+                  ),
+                  attribute("event.sequence", "9"),
+                  attribute("session.id", sessionId),
+                  attribute("prompt.id", "prompt-replacement"),
+                  attribute("query_source", "repl_main_thread"),
+                  attribute("request_body", privateRequest)
                 ]
               }
             ]

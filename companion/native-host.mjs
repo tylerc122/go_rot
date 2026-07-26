@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import crypto from "node:crypto";
 import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
@@ -21,6 +22,8 @@ import { normalizeLifecycleEvent } from "./protocol.mjs";
 const execFileAsync = promisify(execFile);
 const sessions = new Map();
 const pendingClaudeRejections = new Map();
+const latestClaudeStarts = new Map();
+const recentLifecycle = [];
 const nativeDecoder = new NativeMessageDecoder();
 let extensionConnected = true;
 let server;
@@ -85,7 +88,7 @@ async function startSocketServer() {
         try {
           const raw = JSON.parse(line);
           const event = normalizeLifecycleEvent(raw);
-          recordEvent(event);
+          recordEvent(event, "hook");
           sendNative({ type: "lifecycle.event", event });
           connection.end(`${JSON.stringify({ ok: true })}\n`);
         } catch (error) {
@@ -107,13 +110,18 @@ async function startSocketServer() {
   fs.chmodSync(socketPath(), 0o600);
 }
 
-function recordEvent(event) {
+function recordEvent(event, source) {
   const key = sessionKey(event);
-  if (
-    event.agent === "claude-code" &&
-    ["work.started", "work.completed", "session.ended"].includes(event.type)
-  ) {
-    pendingClaudeRejections.delete(event.sessionId);
+  if (event.agent === "claude-code") {
+    if (event.type === "work.started") {
+      rememberClaudeStart(event);
+    }
+    if (["work.started", "work.completed", "session.ended"].includes(event.type)) {
+      pendingClaudeRejections.delete(event.sessionId);
+    }
+    if (event.type === "session.ended") {
+      latestClaudeStarts.delete(event.sessionId);
+    }
   }
   if (event.type === "work.started") {
     sessions.set(key, {
@@ -135,7 +143,7 @@ function recordEvent(event) {
       }
     }
   }
-  persistState();
+  recordLifecycle(source, event);
 }
 
 async function handleExtensionMessage(message) {
@@ -144,7 +152,13 @@ async function handleExtensionMessage(message) {
   if (message.type === "activity.reset") {
     sessions.clear();
     pendingClaudeRejections.clear();
-    persistState();
+    latestClaudeStarts.clear();
+    recordLifecycle("extension", {
+      type: message.type,
+      agent: "system",
+      sessionId: "system",
+      timestamp: Date.now()
+    });
     return;
   }
 
@@ -153,6 +167,10 @@ async function handleExtensionMessage(message) {
     message.type === "session.return" ||
     message.type === "source.focus"
   ) {
+    recordLifecycle("extension", {
+      ...message,
+      timestamp: Date.now()
+    });
     const key = messageKey(message);
     const session = sessions.get(key);
     const source = session ?? message;
@@ -197,6 +215,10 @@ async function handleExtensionMessage(message) {
   }
 
   if (message.type === "task.release") {
+    recordLifecycle("extension", {
+      ...message,
+      timestamp: Date.now()
+    });
     sessions.delete(messageKey(message));
     persistState();
     return;
@@ -218,20 +240,49 @@ async function startDecisionReceiver() {
     claudeOtelReceiver = await startClaudeOtelReceiver({
       config,
       onDecision: forwardClaudeDecision,
-      onPrompt: forwardClaudePrompt
+      onPrompt: forwardClaudePrompt,
+      onEvent: forwardClaudeMonitoringEvent
     });
   } catch {
     // Claude continues normally. PostToolUse remains the late resume fallback.
   }
 }
 
+function forwardClaudeMonitoringEvent(event) {
+  const eventName = String(event.eventName ?? "unknown")
+    .replace(/^claude_code\./, "")
+    .replace(/[^a-z0-9_.-]/gi, "_")
+    .slice(0, 64);
+  recordLifecycle("monitoring", {
+    type: `otel.${eventName || "unknown"}`,
+    agent: "claude-code",
+    sessionId: event.sessionId,
+    timestamp: event.timestamp,
+    sequence: event.sequence,
+    promptId: event.promptId,
+    querySource: event.querySource
+  });
+  if (eventName === "api_request") {
+    forwardClaudeReplacementRequest(event);
+  }
+}
+
 function forwardClaudeDecision(decision) {
+  const delayedRestart =
+    decision.decision === "reject"
+      ? claudeStartAfterDecision(decision.sessionId, decision.timestamp)
+      : null;
   if (decision.decision === "accept") {
+    pendingClaudeRejections.delete(decision.sessionId);
+  } else if (delayedRestart) {
     pendingClaudeRejections.delete(decision.sessionId);
   } else {
     pendingClaudeRejections.set(decision.sessionId, {
       sequence: decision.sequence,
-      timestamp: decision.timestamp
+      timestamp: decision.timestamp,
+      promptId: decision.promptId,
+      serviceName: decision.serviceName,
+      terminalType: decision.terminalType
     });
     if (pendingClaudeRejections.size > 128) {
       pendingClaudeRejections.delete(
@@ -249,6 +300,41 @@ function forwardClaudeDecision(decision) {
     sourceApp: desktop ? "Claude" : sourceAppFromTerminal(decision.terminalType),
     timestamp: decision.timestamp
   });
+  recordLifecycle("decision", event);
+  sendNative({ type: "lifecycle.event", event });
+  if (delayedRestart) {
+    recordLifecycle("replay", delayedRestart);
+    sendNative({ type: "lifecycle.event", event: delayedRestart });
+  }
+}
+
+function forwardClaudeReplacementRequest(request) {
+  const rejection = pendingClaudeRejections.get(request.sessionId);
+  if (
+    !rejection ||
+    !rejection.promptId ||
+    request.promptId !== rejection.promptId ||
+    request.querySource !== "main" ||
+    !eventFollows(request, rejection)
+  ) {
+    return;
+  }
+  pendingClaudeRejections.delete(request.sessionId);
+
+  const desktop = rejection.serviceName === "claude-code-desktop";
+  const event = normalizeLifecycleEvent({
+    type: "work.started",
+    agent: "claude-code",
+    surface: desktop ? "desktop" : "cli",
+    sessionId: request.sessionId,
+    turnId: "unknown-turn",
+    sourceApp: desktop
+      ? "Claude"
+      : sourceAppFromTerminal(rejection.terminalType),
+    timestamp: request.timestamp
+  });
+  rememberClaudeStart(event);
+  recordLifecycle("api", event);
   sendNative({ type: "lifecycle.event", event });
 }
 
@@ -267,7 +353,26 @@ function forwardClaudePrompt(prompt) {
     sourceApp: desktop ? "Claude" : sourceAppFromTerminal(prompt.terminalType),
     timestamp: prompt.timestamp
   });
+  rememberClaudeStart(event);
+  recordLifecycle("prompt", event);
   sendNative({ type: "lifecycle.event", event });
+}
+
+function rememberClaudeStart(event) {
+  latestClaudeStarts.delete(event.sessionId);
+  latestClaudeStarts.set(event.sessionId, { ...event });
+  if (latestClaudeStarts.size > 128) {
+    latestClaudeStarts.delete(latestClaudeStarts.keys().next().value);
+  }
+}
+
+function claudeStartAfterDecision(sessionId, decisionTimestamp) {
+  const event = latestClaudeStarts.get(sessionId);
+  return Number.isFinite(event?.timestamp) &&
+    Number.isFinite(decisionTimestamp) &&
+    event.timestamp > decisionTimestamp
+    ? event
+    : null;
 }
 
 function eventFollows(candidate, previous) {
@@ -356,6 +461,20 @@ async function prepareRuntime() {
         );
       }
     }
+    for (const entry of state.recentLifecycle ?? []) {
+      if (
+        entry &&
+        typeof entry.source === "string" &&
+        typeof entry.type === "string" &&
+        typeof entry.session === "string" &&
+        Number.isFinite(entry.timestamp)
+      ) {
+        recentLifecycle.push(entry);
+      }
+    }
+    if (recentLifecycle.length > 64) {
+      recentLifecycle.splice(0, recentLifecycle.length - 64);
+    }
   } catch {
     // A missing or stale state file is safe to ignore.
   }
@@ -365,10 +484,50 @@ function persistState() {
   const temporary = `${statePath()}.tmp`;
   fs.writeFileSync(
     temporary,
-    JSON.stringify({ version: 1, sessions: [...sessions.values()] }),
+    JSON.stringify({
+      version: 1,
+      sessions: [...sessions.values()],
+      recentLifecycle
+    }),
     { mode: 0o600 }
   );
   fs.renameSync(temporary, statePath());
+}
+
+function recordLifecycle(source, event) {
+  const entry = {
+    source,
+    type: String(event.type ?? "unknown"),
+    agent: String(event.agent ?? "unknown"),
+    session: sessionDigest(event.sessionId),
+    timestamp: Number.isFinite(event.timestamp) ? event.timestamp : Date.now()
+  };
+  if (event.sequence != null) {
+    entry.sequence = String(event.sequence).slice(0, 24);
+  }
+  if (event.promptId) {
+    entry.prompt = opaqueDigest(event.promptId);
+  }
+  if (["main", "compact", "other"].includes(event.querySource)) {
+    entry.querySource = event.querySource;
+  }
+  recentLifecycle.push(entry);
+  if (recentLifecycle.length > 64) {
+    recentLifecycle.splice(0, recentLifecycle.length - 64);
+  }
+  persistState();
+}
+
+function sessionDigest(sessionId) {
+  return opaqueDigest(sessionId);
+}
+
+function opaqueDigest(value) {
+  return crypto
+    .createHash("sha256")
+    .update(String(value ?? "unknown"))
+    .digest("hex")
+    .slice(0, 12);
 }
 
 function sessionKey(event) {
