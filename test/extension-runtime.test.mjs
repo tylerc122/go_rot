@@ -396,6 +396,39 @@ test("a native Claude rejection closes the parked feed", async () => {
   assert.equal(createdWindows.at(-1).id, 110);
 });
 
+test("a manually minimized feed closes when completion has a different turn id", async () => {
+  await events.runtimeMessage.request({ type: "activity.reset" });
+  const windowsBefore = createdWindows.length;
+  await lifecycle(
+    work("work.started", "codex", "minimized-session", "submitted-turn", "Codex")
+  );
+  await waitFor(() => createdWindows.length === windowsBefore + 1);
+  const minimizedWindowId = createdWindows.at(-1).id;
+
+  await events.windowFocused.emit(-1);
+  const minimized = await events.runtimeMessage.request({ type: "status.get" });
+  assert.equal(minimized.feedSession.userLeft, true);
+
+  await lifecycle(
+    work(
+      "work.completed",
+      "codex",
+      "minimized-session",
+      "unknown-turn",
+      "Codex"
+    )
+  );
+
+  assert.equal(removedWindows.at(-1), minimizedWindowId);
+  const completed = await events.runtimeMessage.request({ type: "status.get" });
+  assert.deepEqual(completed.activity, {
+    working: 0,
+    attention: 0,
+    ready: 0
+  });
+  assert.equal(completed.feedSession, null);
+});
+
 function work(type, agent, sessionId, turnId, sourceApp) {
   return {
     type,

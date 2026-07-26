@@ -67,6 +67,57 @@ test("late resume signals cannot resurrect a ready turn", () => {
   });
 });
 
+test("completion resolves the sole pending task when its turn id changes", () => {
+  const registry = new SessionRegistry();
+  const pending = task("codex", "session", "submitted-turn");
+  registry.start("codex:session:submitted-turn", pending);
+  registry.requireAttention("codex:session:submitted-turn", {
+    ...pending.event,
+    reason: "permission"
+  });
+
+  const result = registry.complete("codex:session:unknown-turn", {
+    agent: "codex",
+    sessionId: "session",
+    turnId: "unknown-turn"
+  });
+
+  assert.equal(result.kind, "completed");
+  assert.equal(result.task, pending);
+  assert.deepEqual(registry.counts(), {
+    working: 0,
+    attention: 0,
+    ready: 1
+  });
+  assert.equal(registry.pendingCount(), 0);
+});
+
+test("completion stays conservative when a provider session has multiple pending tasks", () => {
+  const registry = new SessionRegistry();
+  registry.start(
+    "codex:session:turn-1",
+    task("codex", "session", "turn-1")
+  );
+  registry.start(
+    "codex:session:turn-2",
+    task("codex", "session", "turn-2")
+  );
+
+  const result = registry.complete("codex:session:unknown-turn", {
+    agent: "codex",
+    sessionId: "session",
+    turnId: "unknown-turn"
+  });
+
+  assert.equal(result.kind, "recovered");
+  assert.deepEqual(registry.counts(), {
+    working: 2,
+    attention: 0,
+    ready: 1
+  });
+  assert.equal(registry.pendingCount(), 2);
+});
+
 test("a new user turn resolves an older question in the same provider session", () => {
   const registry = new SessionRegistry();
   const question = task("claude-code", "session", "turn-1");

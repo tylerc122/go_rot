@@ -73,6 +73,16 @@ export class SessionRegistry {
 
   complete(key, event) {
     let task = this.#tasks.get(key);
+    if (!task) {
+      const pendingMatches = [...this.#tasks.values()].filter(
+        (candidate) =>
+          ["working", "attention"].includes(candidate.state) &&
+          sameProviderSession(candidate.event, event)
+      );
+      if (pendingMatches.length === 1) {
+        task = pendingMatches[0];
+      }
+    }
     const kind = task ? "completed" : "recovered";
     if (!task) {
       task = {
