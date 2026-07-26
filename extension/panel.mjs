@@ -15,6 +15,7 @@ const elements = {
   providers: [...document.querySelectorAll('input[name="provider"]')],
   testFeed: document.querySelector("#test-feed"),
   pauseMedia: document.querySelector("#pause-media"),
+  finishCurrentClip: document.querySelector("#finish-current-clip"),
   pauseDetail: document.querySelector("#pause-detail"),
   pauseControls: document.querySelector("#pause-controls"),
   pauseDuration: document.querySelector("#pause-duration"),
@@ -50,11 +51,21 @@ function bindEvents() {
     provider.addEventListener("change", async () => {
       if (!provider.checked) return;
       let pauseMedia = elements.pauseMedia.checked;
-      if (pauseMedia) {
-        pauseMedia = await requestFeedAccess(provider.value);
-        elements.pauseMedia.checked = pauseMedia;
+      let finishCurrentClip = elements.finishCurrentClip.checked;
+      if (pauseMedia || finishCurrentClip) {
+        const granted = await requestFeedAccess(provider.value);
+        if (!granted) {
+          pauseMedia = false;
+          finishCurrentClip = false;
+          elements.pauseMedia.checked = false;
+          elements.finishCurrentClip.checked = false;
+        }
       }
-      updateSettings({ provider: provider.value, pauseMedia });
+      updateSettings({
+        provider: provider.value,
+        pauseMedia,
+        finishCurrentClip
+      });
     });
   }
 
@@ -66,6 +77,16 @@ function bindEvents() {
     const granted = await requestFeedAccess(selectedProvider());
     elements.pauseMedia.checked = granted;
     updateSettings({ pauseMedia: granted });
+  });
+
+  elements.finishCurrentClip.addEventListener("change", async () => {
+    if (!elements.finishCurrentClip.checked) {
+      updateSettings({ finishCurrentClip: false });
+      return;
+    }
+    const granted = await requestFeedAccess(selectedProvider());
+    elements.finishCurrentClip.checked = granted;
+    updateSettings({ finishCurrentClip: granted });
   });
 
   elements.agentClaude.addEventListener("change", updateAgents);
@@ -155,6 +176,7 @@ function render(next) {
   elements.agentClaude.checked = settings.agents["claude-code"];
   elements.agentCodex.checked = settings.agents.codex;
   elements.pauseMedia.checked = settings.pauseMedia;
+  elements.finishCurrentClip.checked = settings.finishCurrentClip;
   for (const provider of elements.providers) {
     provider.checked = provider.value === settings.provider;
   }

@@ -57,9 +57,17 @@ chrome.windows.onFocusChanged?.addListener((windowId) => {
     return;
   }
 
-  if (feed.ownsFocus && feed.state === "active") {
+  if (feed.ownsFocus && ["active", "finishing"].includes(feed.state)) {
     feed.ownsFocus = false;
     feed.userLeft = true;
+    if (feed.state === "finishing") {
+      finishFeed(
+        feed.finishReason ?? "work.completed",
+        feed.finishSourceEvent ?? feed.anchorEvent
+      )
+        .then(refreshStatus)
+        .catch(() => {});
+    }
   }
 });
 
@@ -144,7 +152,12 @@ async function handleLifecycleEvent(event) {
       scheduleFeed(event, settings);
     } else {
       feedSession.anchorEvent = event;
-      if (feedSession.state === "parked" && registry.counts().attention === 0) {
+      if (feedSession.state === "finishing") {
+        await cancelFinishCurrentClip(feedSession);
+      } else if (
+        feedSession.state === "parked" &&
+        registry.counts().attention === 0
+      ) {
         await resumeFeed();
       }
     }
@@ -178,7 +191,9 @@ async function handleLifecycleEvent(event) {
     registry.complete(key, event);
     if (registry.pendingCount() === 0) {
       if (feedSession) {
-        await finishFeed("work.completed", event);
+        if (!startFinishCurrentClip(feedSession, "work.completed", event)) {
+          await finishFeed("work.completed", event);
+        }
       } else {
         notifyReady(event);
       }
@@ -201,7 +216,10 @@ async function handleLifecycleEvent(event) {
     registry.endSession(event.agent, event.sessionId);
     if (registry.pendingCount() === 0) {
       if (feedSession) {
-        await finishFeed("session.ended", feedSession.anchorEvent ?? event);
+        const sourceEvent = feedSession.anchorEvent ?? event;
+        if (!startFinishCurrentClip(feedSession, "session.ended", sourceEvent)) {
+          await finishFeed("session.ended", sourceEvent);
+        }
       }
       registry.clearReady();
     } else if (feedSession) {
@@ -234,7 +252,11 @@ function scheduleFeed(event, settings, delayMs = settings.delayMs) {
     userLeft: false,
     intentionalBlur: false,
     closing: false,
-    tabId: null
+    tabId: null,
+    finishGeneration: 0,
+    finishCancel: null,
+    finishReason: null,
+    finishSourceEvent: null
   };
   feedSession = feed;
   feed.timerId = setTimeout(
@@ -285,12 +307,16 @@ async function openFeed(feed) {
   feed.state = "active";
   feed.ownsFocus = true;
   feed.userLeft = false;
+  await foregroundFeed(feed);
   broadcastStatus();
 }
 
 async function parkFeed(event, reason) {
   const feed = feedSession;
   if (!feed) return;
+  if (feed.state === "finishing") {
+    await cancelFinishCurrentClip(feed);
+  }
   clearFeedTimer(feed);
   feed.state = "parked";
   feed.anchorEvent = event;
@@ -332,9 +358,112 @@ async function resumeFeed() {
     feed.ownsFocus = true;
     feed.userLeft = false;
     feed.intentionalBlur = false;
+    await foregroundFeed(feed);
   } catch (error) {
     failFeed(feed, error);
   }
+}
+
+async function foregroundFeed(feed) {
+  if (
+    feedSession !== feed ||
+    feed.windowId === null ||
+    feed.closing ||
+    !nativePort
+  ) {
+    return;
+  }
+
+  await chrome.windows.update(feed.windowId, { focused: true });
+  nativePort.postMessage({
+    type: "feed.activate",
+    windowId: feed.windowId
+  });
+}
+
+function startFinishCurrentClip(feed, reason, sourceEvent) {
+  if (
+    feedSession !== feed ||
+    feed.closing ||
+    !feed.settings.finishCurrentClip ||
+    feed.state !== "active" ||
+    !feed.ownsFocus ||
+    feed.userLeft ||
+    feed.windowId === null ||
+    feed.tabId === null
+  ) {
+    return false;
+  }
+
+  clearFeedTimer(feed);
+  feed.state = "finishing";
+  feed.finishReason = reason;
+  feed.finishSourceEvent = sourceEvent;
+  const generation = ++feed.finishGeneration;
+  broadcastStatus();
+  completeAfterCurrentClip(feed, generation).catch((error) => {
+    if (feedSession !== feed || feed.finishGeneration !== generation) return;
+    lastError = error.message;
+    finishFeed(reason, sourceEvent).then(refreshStatus).catch(() => {});
+  });
+  return true;
+}
+
+async function completeAfterCurrentClip(feed, generation) {
+  const cancelled = new Promise((resolve) => {
+    feed.finishCancel = resolve;
+  });
+
+  try {
+    await Promise.race([
+      chrome.scripting.executeScript({
+        target: { tabId: feed.tabId },
+        func: finishVisibleClip
+      }),
+      cancelled
+    ]);
+  } catch {
+    // Missing or revoked site access falls back to the normal immediate return.
+  } finally {
+    if (feed.finishGeneration === generation) feed.finishCancel = null;
+  }
+
+  if (
+    feedSession !== feed ||
+    feed.finishGeneration !== generation ||
+    feed.state !== "finishing" ||
+    registry.pendingCount() > 0
+  ) {
+    return;
+  }
+
+  await finishFeed(feed.finishReason, feed.finishSourceEvent);
+  await refreshStatus();
+}
+
+async function cancelFinishCurrentClip(feed) {
+  if (feed.state !== "finishing") return;
+  invalidateClipFinish(feed);
+  feed.state = "active";
+  feed.finishReason = null;
+  feed.finishSourceEvent = null;
+  broadcastStatus();
+
+  if (feed.tabId === null) return;
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: feed.tabId },
+      func: cancelFinishClipOverlay
+    });
+  } catch {
+    // A navigation or revoked permission can remove the overlay for us.
+  }
+}
+
+function invalidateClipFinish(feed) {
+  feed.finishGeneration += 1;
+  feed.finishCancel?.([{ result: { reason: "cancelled" } }]);
+  feed.finishCancel = null;
 }
 
 async function finishFeed(reason, sourceEvent = feedSession?.anchorEvent) {
@@ -343,10 +472,13 @@ async function finishFeed(reason, sourceEvent = feedSession?.anchorEvent) {
 
   clearFeedTimer(feed);
   feed.closing = true;
+  invalidateClipFinish(feed);
   const hadWindow = feed.windowId !== null;
   const shouldFocus =
     ["manual", "shortcut", "settings.changed"].includes(reason) ||
-    (feed.state === "active" && feed.ownsFocus && !feed.userLeft);
+    (["active", "finishing"].includes(feed.state) &&
+      feed.ownsFocus &&
+      !feed.userLeft);
 
   if (feed.windowId !== null) {
     await safeCloseWindow(feed.windowId);
@@ -454,9 +586,12 @@ async function handleUiMessage(message) {
     const current = await loadSettings();
     const settings = clampSettings({ ...current, ...message.settings });
     await chrome.storage.local.set(settings);
+    if (feedSession) feedSession.settings = settings;
     if (
       feedSession &&
-      (!settings.enabled || settings.pausedUntil > Date.now())
+      (!settings.enabled ||
+        settings.pausedUntil > Date.now() ||
+        (feedSession.state === "finishing" && !settings.finishCurrentClip))
     ) {
       await finishFeed("settings.changed");
     }
@@ -594,6 +729,205 @@ function togglePagePlayback(paused) {
       delete video.dataset[marker];
       video.play().catch(() => {});
     }
+  }
+}
+
+function cancelFinishClipOverlay() {
+  document.dispatchEvent(new CustomEvent("firsttok:cancel-finish-clip"));
+  document.getElementById("firsttok-finish-clip")?.remove();
+}
+
+function finishVisibleClip() {
+  const overlayId = "firsttok-finish-clip";
+  const cancelEvent = "firsttok:cancel-finish-clip";
+  document.getElementById(overlayId)?.remove();
+
+  const video = findVisiblePlayingVideo();
+
+  if (!video || video.duration - video.currentTime <= 0.25) {
+    return { reason: "no-playing-video" };
+  }
+
+  return new Promise((resolve) => {
+    const host = document.createElement("div");
+    host.id = overlayId;
+    host.style.setProperty("position", "fixed", "important");
+    host.style.setProperty("left", "50%", "important");
+    host.style.setProperty("bottom", "24px", "important");
+    host.style.setProperty("transform", "translateX(-50%)", "important");
+    host.style.setProperty("z-index", "2147483647", "important");
+    host.style.setProperty("pointer-events", "auto", "important");
+
+    const shadow = host.attachShadow({ mode: "closed" });
+    const style = document.createElement("style");
+    style.textContent = `
+      :host { all: initial; }
+      .notice {
+        box-sizing: border-box;
+        display: flex;
+        min-width: 280px;
+        max-width: min(420px, calc(100vw - 32px));
+        align-items: center;
+        gap: 14px;
+        padding: 11px 12px 11px 15px;
+        border: 1px solid oklch(84% 0.025 70);
+        border-radius: 12px;
+        background: oklch(98% 0.014 75);
+        box-shadow: 0 8px 28px oklch(20% 0.02 40 / 0.24);
+        color: oklch(25% 0.025 40);
+        font: 13px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      .copy {
+        display: flex;
+        min-width: 0;
+        flex: 1;
+        flex-direction: column;
+      }
+      strong { font-size: 13px; font-weight: 700; }
+      span { color: oklch(47% 0.025 40); font-size: 12px; }
+      button {
+        min-height: 40px;
+        flex: 0 0 auto;
+        padding: 0 13px;
+        border: 1px solid oklch(58% 0.18 35);
+        border-radius: 8px;
+        background: oklch(62% 0.19 35);
+        color: white;
+        cursor: pointer;
+        font: 650 12px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      button:hover { background: oklch(57% 0.19 35); }
+      button:focus-visible {
+        outline: 3px solid oklch(72% 0.14 45 / 0.45);
+        outline-offset: 2px;
+      }
+    `;
+    const notice = document.createElement("div");
+    notice.className = "notice";
+    notice.setAttribute("role", "status");
+    notice.setAttribute("aria-live", "polite");
+
+    const copy = document.createElement("div");
+    copy.className = "copy";
+    const title = document.createElement("strong");
+    title.textContent = "Agent ready";
+    const detail = document.createElement("span");
+    detail.textContent = "Finishing this clip";
+    copy.append(title, detail);
+
+    const returnNow = document.createElement("button");
+    returnNow.type = "button";
+    returnNow.textContent = "Return now";
+    notice.append(copy, returnNow);
+    shadow.append(style, notice);
+    document.documentElement.append(host);
+
+    const initialPageUrl = location.href;
+    const initialSourceUrl = video.currentSrc;
+    let previousTime = video.currentTime;
+    let settled = false;
+    let identityTimerId;
+
+    const finish = (reason) => {
+      if (settled) return;
+      settled = true;
+      clearInterval(identityTimerId);
+      video.removeEventListener("ended", onEnded);
+      video.removeEventListener("timeupdate", onTimeUpdate);
+      video.removeEventListener("loadstart", onClipIdentityCheck);
+      document.removeEventListener(cancelEvent, onCancel);
+      host.remove();
+      resolve({ reason });
+    };
+    const onEnded = () => finish("ended");
+    const onTimeUpdate = () => {
+      const currentTime = video.currentTime;
+      if (currentTime + 0.25 >= video.duration) {
+        finish("ended");
+        return;
+      }
+      if (
+        previousTime >= video.duration - 0.75 &&
+        currentTime < Math.min(1, video.duration * 0.1)
+      ) {
+        finish("looped");
+        return;
+      }
+      previousTime = currentTime;
+    };
+    const onClipIdentityCheck = () => {
+      if (!video.isConnected || location.href !== initialPageUrl) {
+        finish("clip-changed");
+        return;
+      }
+
+      const currentSourceUrl = video.currentSrc;
+      if (
+        initialSourceUrl &&
+        currentSourceUrl &&
+        currentSourceUrl !== initialSourceUrl
+      ) {
+        finish("clip-changed");
+        return;
+      }
+
+      const visiblePlayingVideo = findVisiblePlayingVideo();
+      if (visiblePlayingVideo && visiblePlayingVideo !== video) {
+        finish("clip-changed");
+      }
+    };
+    const onCancel = () => finish("cancelled");
+
+    returnNow.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      finish("return-now");
+    });
+    video.addEventListener("ended", onEnded, { once: true });
+    video.addEventListener("timeupdate", onTimeUpdate);
+    video.addEventListener("loadstart", onClipIdentityCheck);
+    document.addEventListener(cancelEvent, onCancel, { once: true });
+    identityTimerId = setInterval(onClipIdentityCheck, 100);
+  });
+
+  function findVisiblePlayingVideo() {
+    return [...document.querySelectorAll("video")]
+      .map((candidate) => ({
+        candidate,
+        score: visibleVideoArea(candidate)
+      }))
+      .filter(
+        ({ candidate, score }) =>
+          score > 0 &&
+          !candidate.paused &&
+          !candidate.ended &&
+          Number.isFinite(candidate.duration) &&
+          candidate.duration > 0 &&
+          Number.isFinite(candidate.currentTime) &&
+          candidate.playbackRate > 0
+      )
+      .sort((left, right) => right.score - left.score)[0]?.candidate;
+  }
+
+  function visibleVideoArea(candidate) {
+    const style = getComputedStyle(candidate);
+    if (
+      style.display === "none" ||
+      style.visibility === "hidden" ||
+      Number(style.opacity) === 0
+    ) {
+      return 0;
+    }
+    const rect = candidate.getBoundingClientRect();
+    const width = Math.max(
+      0,
+      Math.min(rect.right, innerWidth) - Math.max(rect.left, 0)
+    );
+    const height = Math.max(
+      0,
+      Math.min(rect.bottom, innerHeight) - Math.max(rect.top, 0)
+    );
+    return width * height;
   }
 }
 

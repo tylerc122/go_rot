@@ -16,6 +16,7 @@ import {
 } from "./constants.mjs";
 import { readClaudeOtelConfig } from "./claude-otel-config.mjs";
 import { startClaudeOtelReceiver } from "./claude-otel-receiver.mjs";
+import { activateChromeFeed } from "./macos-activation.mjs";
 import { NativeMessageDecoder, encodeNativeMessage } from "./native-framing.mjs";
 import { normalizeLifecycleEvent } from "./protocol.mjs";
 
@@ -148,6 +149,24 @@ function recordEvent(event, source) {
 
 async function handleExtensionMessage(message) {
   if (!message || typeof message !== "object") return;
+
+  if (message.type === "feed.activate") {
+    let activated = false;
+    try {
+      activated = await activateChromeFeed();
+    } catch {
+      sendNative({
+        type: "companion.error",
+        message: "The feed opened, but macOS could not bring it to the foreground."
+      });
+    }
+    sendNative({
+      type: "feed.activated",
+      windowId: message.windowId,
+      success: activated
+    });
+    return;
+  }
 
   if (message.type === "activity.reset") {
     sessions.clear();

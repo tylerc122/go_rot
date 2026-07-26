@@ -40,6 +40,17 @@ test("presents disabled, paused, active, disconnected, and ready states", () => 
     }).title,
     "Claude Code is working"
   );
+  assert.deepEqual(
+    statusPresentation({
+      settings: readySettings,
+      feedSession: { agent: "codex", state: "finishing" }
+    }),
+    {
+      tone: "ready",
+      title: "Agent ready",
+      detail: "Finishing this clip, then returning."
+    }
+  );
   assert.equal(
     statusPresentation({
       settings: readySettings,

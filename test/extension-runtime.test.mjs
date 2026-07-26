@@ -17,6 +17,8 @@ const createdWindows = [];
 const removedWindows = [];
 const updatedWindows = [];
 const playbackChanges = [];
+const finishClipCalls = [];
+const cancelFinishClipCalls = [];
 const badgeText = [];
 const settings = {
   ...DEFAULT_SETTINGS,
@@ -24,6 +26,8 @@ const settings = {
   delayMs: 0
 };
 let nextWindowId = 100;
+let pendingFinishClip = null;
+let finishVisibleClipFunction = null;
 
 const nativePort = {
   onMessage: events.portMessage,
@@ -81,10 +85,25 @@ globalThis.chrome = {
   },
   scripting: {
     async executeScript(options) {
-      playbackChanges.push({
-        tabId: options.target.tabId,
-        paused: options.args[0]
-      });
+      if (options.func.name === "togglePagePlayback") {
+        playbackChanges.push({
+          tabId: options.target.tabId,
+          paused: options.args[0]
+        });
+        return;
+      }
+      if (options.func.name === "finishVisibleClip") {
+        finishVisibleClipFunction = options.func;
+        finishClipCalls.push({
+          tabId: options.target.tabId,
+          hasDeadlineArgument: Array.isArray(options.args) && options.args.length > 0
+        });
+        return pendingFinishClip ?? [{ result: { reason: "ended" } }];
+      }
+      if (options.func.name === "cancelFinishClipOverlay") {
+        cancelFinishClipCalls.push({ tabId: options.target.tabId });
+        return [{ result: true }];
+      }
     }
   },
   action: {
@@ -108,6 +127,12 @@ test("keeps one feed through permissions and concurrent turns", async () => {
   settings.pauseMedia = true;
   await lifecycle(work("work.started", "codex", "s1", "t1", "Terminal"));
   await waitFor(() => createdWindows.length === 1);
+  assert.ok(
+    postedToNative.some(
+      (message) =>
+        message.type === "feed.activate" && message.windowId === 100
+    )
+  );
 
   await lifecycle(work("work.started", "claude-code", "s2", "t2", "iTerm"));
   assert.equal(createdWindows.length, 1);
@@ -142,6 +167,13 @@ test("keeps one feed through permissions and concurrent turns", async () => {
     )
   );
   assert.deepEqual(playbackChanges.at(-1), { tabId: 1000, paused: false });
+  assert.equal(
+    postedToNative.filter(
+      (message) =>
+        message.type === "feed.activate" && message.windowId === 100
+    ).length,
+    2
+  );
 
   await lifecycle(work("work.completed", "codex", "s1", "t1", "Terminal"));
   assert.equal(removedWindows.length, 0);
@@ -398,11 +430,13 @@ test("a native Claude rejection closes the parked feed", async () => {
 
 test("a manually minimized feed closes when completion has a different turn id", async () => {
   await events.runtimeMessage.request({ type: "activity.reset" });
+  settings.finishCurrentClip = true;
   const windowsBefore = createdWindows.length;
   await lifecycle(
     work("work.started", "codex", "minimized-session", "submitted-turn", "Codex")
   );
   await waitFor(() => createdWindows.length === windowsBefore + 1);
+  await waitForFeedState("active");
   const minimizedWindowId = createdWindows.at(-1).id;
 
   await events.windowFocused.emit(-1);
@@ -427,6 +461,128 @@ test("a manually minimized feed closes when completion has a different turn id",
     ready: 0
   });
   assert.equal(completed.feedSession, null);
+  assert.equal(
+    finishClipCalls.some((call) => call.tabId === minimizedWindowId * 10),
+    false
+  );
+  settings.finishCurrentClip = false;
+});
+
+test("finishes the playing clip before returning to a ready agent", async () => {
+  await events.runtimeMessage.request({ type: "activity.reset" });
+  settings.finishCurrentClip = true;
+  let finishClip;
+  pendingFinishClip = new Promise((resolve) => {
+    finishClip = resolve;
+  });
+
+  const windowsBefore = createdWindows.length;
+  const removalsBefore = removedWindows.length;
+  await lifecycle(
+    work("work.started", "codex", "finish-clip", "one", "Codex")
+  );
+  await waitFor(() => createdWindows.length === windowsBefore + 1);
+  await waitForFeedState("active");
+  const windowId = createdWindows.at(-1).id;
+
+  await lifecycle(
+    work("work.completed", "codex", "finish-clip", "one", "Codex")
+  );
+
+  const finishing = await events.runtimeMessage.request({ type: "status.get" });
+  assert.equal(finishing.feedSession.state, "finishing");
+  assert.equal(removedWindows.length, removalsBefore);
+  assert.deepEqual(finishClipCalls.at(-1), {
+    tabId: windowId * 10,
+    hasDeadlineArgument: false
+  });
+
+  finishClip([{ result: { reason: "ended" } }]);
+  await waitFor(() => removedWindows.at(-1) === windowId);
+  const completed = await events.runtimeMessage.request({ type: "status.get" });
+  assert.equal(completed.feedSession, null);
+  assert.ok(
+    postedToNative.some(
+      (message) =>
+        message.type === "source.focus" &&
+        message.sessionId === "finish-clip" &&
+        message.final === true
+    )
+  );
+
+  pendingFinishClip = null;
+  settings.finishCurrentClip = false;
+});
+
+test("new work cancels a pending clip finish and keeps the feed open", async () => {
+  await events.runtimeMessage.request({ type: "activity.reset" });
+  settings.finishCurrentClip = true;
+  let finishClip;
+  pendingFinishClip = new Promise((resolve) => {
+    finishClip = resolve;
+  });
+
+  const windowsBefore = createdWindows.length;
+  const removalsBefore = removedWindows.length;
+  await lifecycle(
+    work("work.started", "codex", "finish-cancel", "one", "Codex")
+  );
+  await waitFor(() => createdWindows.length === windowsBefore + 1);
+  await waitForFeedState("active");
+  const windowId = createdWindows.at(-1).id;
+  await lifecycle(
+    work("work.completed", "codex", "finish-cancel", "one", "Codex")
+  );
+  await lifecycle(
+    work("work.started", "codex", "finish-cancel", "two", "Codex")
+  );
+
+  finishClip([{ result: { reason: "cancelled" } }]);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const resumed = await events.runtimeMessage.request({ type: "status.get" });
+  assert.equal(resumed.feedSession.state, "active");
+  assert.equal(resumed.activity.working, 1);
+  assert.equal(removedWindows.length, removalsBefore);
+  assert.deepEqual(cancelFinishClipCalls.at(-1), { tabId: windowId * 10 });
+
+  await events.runtimeMessage.request({ type: "session.return" });
+  await lifecycle(
+    work("work.completed", "codex", "finish-cancel", "two", "Codex")
+  );
+  pendingFinishClip = null;
+  settings.finishCurrentClip = false;
+});
+
+test("clip finishing closes when a different visible video starts", async () => {
+  assert.ok(finishVisibleClipFunction);
+  const page = installFinishClipPage();
+
+  try {
+    const resultPromise = finishVisibleClipFunction();
+    let settled = false;
+    resultPromise.then(() => {
+      settled = true;
+    });
+
+    page.current.paused = true;
+    await new Promise((resolve) => setTimeout(resolve, 125));
+    assert.equal(settled, false);
+
+    page.next.paused = false;
+    let timeoutId;
+    const result = await Promise.race([
+      resultPromise,
+      new Promise((_, reject) => {
+        timeoutId = setTimeout(
+          () => reject(new Error("Clip change was not detected.")),
+          500
+        );
+      })
+    ]).finally(() => clearTimeout(timeoutId));
+    assert.deepEqual(result, { reason: "clip-changed" });
+  } finally {
+    page.restore();
+  }
 });
 
 function work(type, agent, sessionId, turnId, sourceApp) {
@@ -477,4 +633,110 @@ async function waitFor(predicate, timeoutMs = 1000) {
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
   throw new Error("Timed out waiting for extension state.");
+}
+
+async function waitForFeedState(expectedState, timeoutMs = 1000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const status = await events.runtimeMessage.request({ type: "status.get" });
+    if (status.feedSession?.state === expectedState) return status;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error(`Timed out waiting for feed state: ${expectedState}`);
+}
+
+function installFinishClipPage() {
+  class FakeElement extends EventTarget {
+    constructor(tagName) {
+      super();
+      this.tagName = tagName;
+      this.id = "";
+      this.isConnected = true;
+      this.style = { setProperty() {} };
+    }
+
+    append() {}
+    setAttribute() {}
+    attachShadow() {
+      return { append() {} };
+    }
+    remove() {
+      this.isConnected = false;
+    }
+  }
+
+  class FakeVideo extends FakeElement {
+    constructor(source) {
+      super("video");
+      this.currentSrc = source;
+      this.currentTime = 2;
+      this.duration = 20;
+      this.ended = false;
+      this.paused = true;
+      this.playbackRate = 1;
+    }
+
+    getBoundingClientRect() {
+      return { left: 0, top: 0, right: 500, bottom: 800 };
+    }
+  }
+
+  const current = new FakeVideo("https://media.example/current.mp4");
+  const next = new FakeVideo("https://media.example/next.mp4");
+  current.paused = false;
+  const videos = [current, next];
+  const documentEvents = new EventTarget();
+  let overlay = null;
+  const fakeDocument = {
+    addEventListener: documentEvents.addEventListener.bind(documentEvents),
+    removeEventListener: documentEvents.removeEventListener.bind(documentEvents),
+    dispatchEvent: documentEvents.dispatchEvent.bind(documentEvents),
+    createElement(tagName) {
+      return new FakeElement(tagName);
+    },
+    getElementById(id) {
+      return overlay?.id === id ? overlay : null;
+    },
+    querySelectorAll(selector) {
+      return selector === "video" ? videos : [];
+    },
+    documentElement: {
+      append(element) {
+        overlay = element;
+      }
+    }
+  };
+
+  const replacements = {
+    document: fakeDocument,
+    location: { href: "https://example.com/reel/current" },
+    innerWidth: 1000,
+    innerHeight: 1000,
+    getComputedStyle() {
+      return { display: "block", visibility: "visible", opacity: "1" };
+    }
+  };
+  const descriptors = new Map();
+  for (const [name, value] of Object.entries(replacements)) {
+    descriptors.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
+    Object.defineProperty(globalThis, name, {
+      configurable: true,
+      writable: true,
+      value
+    });
+  }
+
+  return {
+    current,
+    next,
+    restore() {
+      for (const [name, descriptor] of descriptors) {
+        if (descriptor) {
+          Object.defineProperty(globalThis, name, descriptor);
+        } else {
+          delete globalThis[name];
+        }
+      }
+    }
+  };
 }

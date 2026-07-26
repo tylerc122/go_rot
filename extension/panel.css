@@ -406,6 +406,10 @@ select {
   cursor: pointer;
 }
 
+.permission-row + .permission-row {
+  margin-top: 0;
+}
+
 .permission-row span {
   display: flex;
   min-width: 0;

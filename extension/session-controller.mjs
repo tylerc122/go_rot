@@ -7,6 +7,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   pausedUntil: 0,
   provider: "youtube",
   pauseMedia: false,
+  finishCurrentClip: false,
   delayMs: 2000,
   windowWidth: 480,
   windowHeight: 820
@@ -74,6 +75,10 @@ export function clampSettings(input = {}) {
       typeof input.pauseMedia === "boolean"
         ? input.pauseMedia
         : DEFAULT_SETTINGS.pauseMedia,
+    finishCurrentClip:
+      typeof input.finishCurrentClip === "boolean"
+        ? input.finishCurrentClip
+        : DEFAULT_SETTINGS.finishCurrentClip,
     delayMs: clampNumber(input.delayMs, 0, 15_000, DEFAULT_SETTINGS.delayMs),
     windowWidth: clampNumber(
       input.windowWidth,

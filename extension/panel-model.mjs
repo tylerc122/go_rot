@@ -52,6 +52,13 @@ export function statusPresentation(snapshot, now = Date.now()) {
     const session = snapshot.feedSession ?? snapshot.activeSession;
     const agent = session.agent ? agentLabel(session.agent) : "Your agent";
     const state = session.state;
+    if (state === "finishing") {
+      return {
+        tone: "ready",
+        title: "Agent ready",
+        detail: "Finishing this clip, then returning."
+      };
+    }
     const title =
       activity.working > 1
         ? `${activity.working} tasks working`

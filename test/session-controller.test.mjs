@@ -23,6 +23,7 @@ test("clamps untrusted settings and falls back to a known provider", () => {
       pausedUntil: DEFAULT_SETTINGS.pausedUntil,
       provider: "youtube",
       pauseMedia: DEFAULT_SETTINGS.pauseMedia,
+      finishCurrentClip: DEFAULT_SETTINGS.finishCurrentClip,
       delayMs: 0,
       windowWidth: 900,
       windowHeight: DEFAULT_SETTINGS.windowHeight
