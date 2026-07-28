@@ -125,8 +125,43 @@ test("hook events travel through the local companion to native messaging", async
       message.type === "lifecycle.event" &&
       message.event.sessionId === "session-e2e"
   )[1];
-  assert.equal(resumed.event.type, "work.resumed");
+  assert.equal(resumed.event.type, "work.started");
   assert.equal("tool_response" in resumed.event, false);
+
+  const continuationHook = spawn(
+    process.execPath,
+    [
+      path.join(root, "bin", "firsttok-hook.mjs"),
+      "--provider",
+      "codex",
+      "--surface",
+      "cli"
+    ],
+    { cwd: root, env: environment, stdio: ["pipe", "pipe", "pipe"] }
+  );
+  continuationHook.stdin.end(
+    JSON.stringify({
+      hook_event_name: "PreToolUse",
+      session_id: "goal-session-e2e",
+      turn_id: "goal-turn-e2e",
+      tool_input: { command: "must stay private" }
+    })
+  );
+  await new Promise((resolve) => continuationHook.once("close", resolve));
+  await waitFor(() =>
+    messages.some(
+      (message) =>
+        message.type === "lifecycle.event" &&
+        message.event.sessionId === "goal-session-e2e"
+    )
+  );
+  const continuation = messages.find(
+    (message) =>
+      message.type === "lifecycle.event" &&
+      message.event.sessionId === "goal-session-e2e"
+  );
+  assert.equal(continuation.event.type, "work.started");
+  assert.equal(JSON.stringify(continuation).includes("must stay private"), false);
 
   host.stdin.write(encodeNativeMessage({ type: "activity.reset" }));
   await waitFor(() => {

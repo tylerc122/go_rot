@@ -24,11 +24,12 @@ if (mapped) {
 function mapHook(payload) {
   switch (payload?.hook_event_name) {
     case "UserPromptSubmit":
+    case "PreToolUse":
       return { type: "work.started" };
     case "PermissionRequest":
       return { type: "attention.required", reason: "permission" };
     case "PostToolUse":
-      return { type: "work.resumed" };
+      return { type: "work.started" };
     case "Stop":
       return { type: "work.completed" };
     case "SessionEnd":

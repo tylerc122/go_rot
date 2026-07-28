@@ -43,7 +43,7 @@ test("maps shared provider hooks into normalized lifecycle events", () => {
   assert.equal("prompt" in started, false);
 });
 
-test("maps permission, resume, notification, stop, and session end hooks", () => {
+test("maps Claude continuation, permission, notification, stop, and session end hooks", () => {
   const options = {
     agent: "claude-code",
     surface: "desktop",
@@ -61,14 +61,32 @@ test("maps permission, resume, notification, stop, and session end hooks", () =>
     );
 
   assert.equal(fixture("PermissionRequest").reason, "permission");
-  assert.equal(fixture("PostToolUse").type, "work.resumed");
+  assert.equal(fixture("PreToolUse").type, "work.started");
+  assert.equal(fixture("PostToolUse").type, "work.started");
   assert.equal(
     fixture("Notification", { notification_type: "idle_prompt" }).reason,
     "question"
   );
   assert.equal(fixture("Stop").type, "work.completed");
   assert.equal(fixture("SessionEnd").type, "session.ended");
-  assert.equal(fixture("PreToolUse"), null);
+  assert.equal(fixture("UnknownHook"), null);
+});
+
+test("maps Codex post-tool activity to the same fallback start", () => {
+  const event = lifecycleEventFromHook(
+    {
+      hook_event_name: "PostToolUse",
+      session_id: "goal-session",
+      turn_id: "goal-turn"
+    },
+    {
+      agent: "codex",
+      surface: "desktop",
+      sourceApp: "Codex"
+    }
+  );
+
+  assert.equal(event.type, "work.started");
 });
 
 test("rejects unknown protocol values", () => {

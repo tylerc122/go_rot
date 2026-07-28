@@ -113,11 +113,12 @@ export function detectSourceApp(agent, surface, env = process.env) {
 function mapHookName(hookName, input) {
   switch (hookName) {
     case "UserPromptSubmit":
+    case "PreToolUse":
       return { type: "work.started" };
     case "PermissionRequest":
       return { type: "attention.required", reason: "permission" };
     case "PostToolUse":
-      return { type: "work.resumed" };
+      return { type: "work.started" };
     case "Notification":
       if (input?.notification_type === "permission_prompt") {
         return { type: "attention.required", reason: "permission" };

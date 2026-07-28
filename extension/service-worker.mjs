@@ -176,7 +176,13 @@ async function handleLifecycleEvent(event) {
   }
 
   if (event.type === "attention.required") {
-    const attention = registry.requireAttention(key, event);
+    const attention = registry.requireAttention(key, event, {
+      recover: event.reason !== "question"
+    });
+    if (attention.kind === "missing") {
+      await refreshStatus();
+      return;
+    }
     if (feedSession) {
       feedSession.anchorEvent = attention.task.event;
       await parkFeed(attention.task.event, event.reason);

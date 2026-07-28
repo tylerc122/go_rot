@@ -514,7 +514,7 @@ test("finishes the playing clip before returning to a ready agent", async () => 
   settings.finishCurrentClip = false;
 });
 
-test("new work cancels a pending clip finish and keeps the feed open", async () => {
+test("a new Claude goal turn cancels a pending clip finish and keeps the feed open", async () => {
   await events.runtimeMessage.request({ type: "activity.reset" });
   settings.finishCurrentClip = true;
   let finishClip;
@@ -525,16 +525,16 @@ test("new work cancels a pending clip finish and keeps the feed open", async () 
   const windowsBefore = createdWindows.length;
   const removalsBefore = removedWindows.length;
   await lifecycle(
-    work("work.started", "codex", "finish-cancel", "one", "Codex")
+    work("work.started", "claude-code", "finish-cancel", "one", "Terminal")
   );
   await waitFor(() => createdWindows.length === windowsBefore + 1);
   await waitForFeedState("active");
   const windowId = createdWindows.at(-1).id;
   await lifecycle(
-    work("work.completed", "codex", "finish-cancel", "one", "Codex")
+    work("work.completed", "claude-code", "finish-cancel", "one", "Terminal")
   );
   await lifecycle(
-    work("work.started", "codex", "finish-cancel", "two", "Codex")
+    work("work.started", "claude-code", "finish-cancel", "two", "Terminal")
   );
 
   finishClip([{ result: { reason: "cancelled" } }]);
@@ -547,10 +547,84 @@ test("new work cancels a pending clip finish and keeps the feed open", async () 
 
   await events.runtimeMessage.request({ type: "session.return" });
   await lifecycle(
-    work("work.completed", "codex", "finish-cancel", "two", "Codex")
+    work("work.completed", "claude-code", "finish-cancel", "two", "Terminal")
   );
   pendingFinishClip = null;
   settings.finishCurrentClip = false;
+});
+
+test("an automatic continuation reopens the feed after the prior turn stops", async () => {
+  await events.runtimeMessage.request({ type: "activity.reset" });
+  const windowsBefore = createdWindows.length;
+
+  await lifecycle(
+    work("work.started", "codex", "goal-session", "turn-1", "Codex")
+  );
+  await waitFor(() => createdWindows.length === windowsBefore + 1);
+  const firstWindowId = createdWindows.at(-1).id;
+  await lifecycle(
+    work("work.completed", "codex", "goal-session", "turn-1", "Codex")
+  );
+  assert.equal(removedWindows.at(-1), firstWindowId);
+
+  await lifecycle(
+    work("work.started", "codex", "goal-session", "turn-2", "Codex")
+  );
+  await waitFor(() => createdWindows.length === windowsBefore + 2);
+  const continued = await events.runtimeMessage.request({ type: "status.get" });
+  assert.equal(continued.activity.working, 1);
+  assert.equal(continued.feedSession.state, "active");
+
+  await events.runtimeMessage.request({ type: "session.return" });
+  await lifecycle(
+    work("work.completed", "codex", "goal-session", "turn-2", "Codex")
+  );
+});
+
+test("a Claude idle notification after completion cannot park or block a new feed", async () => {
+  await events.runtimeMessage.request({ type: "activity.reset" });
+  const windowsBefore = createdWindows.length;
+
+  await lifecycle(
+    work("work.started", "claude-code", "idle-session", "turn-1", "Terminal")
+  );
+  await waitFor(() => createdWindows.length === windowsBefore + 1);
+  const claudeWindowId = createdWindows.at(-1).id;
+  await lifecycle(
+    work("work.completed", "claude-code", "idle-session", "turn-1", "Terminal")
+  );
+  assert.equal(removedWindows.at(-1), claudeWindowId);
+
+  await lifecycle({
+    ...work(
+      "attention.required",
+      "claude-code",
+      "idle-session",
+      "unknown-turn",
+      "Terminal"
+    ),
+    reason: "question"
+  });
+  const afterIdle = await events.runtimeMessage.request({ type: "status.get" });
+  assert.deepEqual(afterIdle.activity, {
+    working: 0,
+    attention: 0,
+    ready: 0
+  });
+  assert.equal(afterIdle.feedSession, null);
+
+  await lifecycle(
+    work("work.started", "codex", "after-idle", "turn-1", "Codex")
+  );
+  await waitFor(() => createdWindows.length === windowsBefore + 2);
+  const afterStart = await events.runtimeMessage.request({ type: "status.get" });
+  assert.equal(afterStart.feedSession.state, "active");
+  assert.equal(afterStart.activity.attention, 0);
+
+  await events.runtimeMessage.request({ type: "session.return" });
+  await lifecycle(
+    work("work.completed", "codex", "after-idle", "turn-1", "Codex")
+  );
 });
 
 test("clip finishing ignores comment state and closes on a new video", async () => {

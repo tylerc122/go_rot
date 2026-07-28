@@ -53,8 +53,21 @@ export class SessionRegistry {
     return { kind: "missing", task: null };
   }
 
-  requireAttention(key, event) {
+  requireAttention(key, event, { recover = true } = {}) {
     let task = this.#tasks.get(key);
+    if (!task) {
+      const pendingMatches = [...this.#tasks.values()].filter(
+        (candidate) =>
+          ["working", "attention"].includes(candidate.state) &&
+          sameProviderSession(candidate.event, event)
+      );
+      if (pendingMatches.length === 1) task = pendingMatches[0];
+    }
+
+    if (!task && !recover) {
+      return { kind: "missing", task: null };
+    }
+
     const kind = task ? "attention" : "recovered";
     if (!task) {
       task = {

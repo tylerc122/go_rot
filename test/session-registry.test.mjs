@@ -67,6 +67,25 @@ test("late resume signals cannot resurrect a ready turn", () => {
   });
 });
 
+test("a new start signal can restart work after the prior turn completed", () => {
+  const registry = new SessionRegistry();
+  const first = task("codex", "goal-session", "turn-1");
+  registry.start("codex:goal-session:turn-1", first);
+  registry.complete("codex:goal-session:turn-1", first.event);
+  registry.clearReady();
+
+  const continuation = task("codex", "goal-session", "turn-2");
+  assert.equal(
+    registry.start("codex:goal-session:turn-2", continuation).kind,
+    "started"
+  );
+  assert.deepEqual(registry.counts(), {
+    working: 1,
+    attention: 0,
+    ready: 0
+  });
+});
+
 test("completion resolves the sole pending task when its turn id changes", () => {
   const registry = new SessionRegistry();
   const pending = task("codex", "session", "submitted-turn");
@@ -134,6 +153,53 @@ test("a new user turn resolves an older question in the same provider session", 
   assert.deepEqual(registry.counts(), {
     working: 1,
     attention: 0,
+    ready: 0
+  });
+});
+
+test("an unmatched idle question cannot create blocking activity", () => {
+  const registry = new SessionRegistry();
+  const result = registry.requireAttention(
+    "claude-code:finished-session:unknown-turn",
+    {
+      agent: "claude-code",
+      sessionId: "finished-session",
+      turnId: "unknown-turn",
+      reason: "question"
+    },
+    { recover: false }
+  );
+
+  assert.equal(result.kind, "missing");
+  assert.equal(result.task, null);
+  assert.deepEqual(registry.counts(), {
+    working: 0,
+    attention: 0,
+    ready: 0
+  });
+});
+
+test("an idle question with a changed turn id attaches to active work", () => {
+  const registry = new SessionRegistry();
+  const active = task("claude-code", "active-session", "submitted-turn");
+  registry.start("claude-code:active-session:submitted-turn", active);
+
+  const result = registry.requireAttention(
+    "claude-code:active-session:unknown-turn",
+    {
+      agent: "claude-code",
+      sessionId: "active-session",
+      turnId: "unknown-turn",
+      reason: "question"
+    },
+    { recover: false }
+  );
+
+  assert.equal(result.kind, "attention");
+  assert.equal(result.task, active);
+  assert.deepEqual(registry.counts(), {
+    working: 0,
+    attention: 1,
     ready: 0
   });
 });

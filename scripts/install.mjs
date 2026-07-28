@@ -137,6 +137,7 @@ function installHooks(provider) {
     provider === "codex"
       ? [
           "UserPromptSubmit",
+          "PreToolUse",
           "PermissionRequest",
           "PostToolUse",
           "Stop",
@@ -144,6 +145,7 @@ function installHooks(provider) {
         ]
       : [
           "UserPromptSubmit",
+          "PreToolUse",
           "PermissionRequest",
           "Notification",
           "PostToolUse",

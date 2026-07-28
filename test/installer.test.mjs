@@ -35,6 +35,7 @@ test("installer merges and removes hooks without overwriting existing settings",
   const installed = JSON.parse(fs.readFileSync(claudeSettings, "utf8"));
   assert.equal(installed.model, "existing-model");
   assert.equal(installed.hooks.Stop.length, 2);
+  assert.ok(installed.hooks.PreToolUse);
   assert.match(JSON.stringify(installed), /FIRSTTOK_HOOK/);
   const claudePermissionHook =
     installed.hooks.PermissionRequest[0].hooks[0];
@@ -85,6 +86,7 @@ test("installer merges and removes hooks without overwriting existing settings",
     fs.readFileSync(path.join(target, ".codex", "hooks.json"), "utf8")
   );
   assert.ok(codexHooks.hooks.UserPromptSubmit);
+  assert.ok(codexHooks.hooks.PreToolUse);
   assert.ok(codexHooks.hooks.PostToolUse);
   const codexHookCommand =
     codexHooks.hooks.UserPromptSubmit[0].hooks[0].command;
