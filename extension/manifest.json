@@ -13,7 +13,8 @@
   "permissions": [
     "nativeMessaging",
     "storage",
-    "scripting"
+    "scripting",
+    "system.display"
   ],
   "optional_host_permissions": [
     "https://www.youtube.com/*",

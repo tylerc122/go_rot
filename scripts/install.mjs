@@ -53,7 +53,7 @@ if (action === "install") {
   console.log("");
   console.log(
     targets.length === 3
-      ? "FirstTok MVP components installed."
+      ? "FirstTok components installed."
       : `Installed FirstTok component: ${targets.join(", ")}.`
   );
   if (targets.includes("native")) {

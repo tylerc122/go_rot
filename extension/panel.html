@@ -34,6 +34,45 @@
         </button>
       </section>
 
+      <details id="setup" class="setup" open>
+        <summary>
+          <span>
+            <strong>Setup</strong>
+            <small id="setup-summary">Checking readiness</small>
+          </span>
+          <span class="setup-chevron" aria-hidden="true"></span>
+        </summary>
+        <ol class="setup-steps">
+          <li data-setup-step="companion">
+            <span class="setup-mark" aria-hidden="true"></span>
+            <span class="setup-copy">
+              <strong>Local companion</strong>
+              <small data-setup-detail="companion">Checking connection</small>
+            </span>
+            <button id="setup-reconnect" class="text-button" type="button">
+              Retry
+            </button>
+          </li>
+          <li data-setup-step="feed">
+            <span class="setup-mark" aria-hidden="true"></span>
+            <span class="setup-copy">
+              <strong>Feed check</strong>
+              <small data-setup-detail="feed">Open your selected feed once</small>
+            </span>
+            <button id="setup-test-feed" class="text-button" type="button">
+              Test feed
+            </button>
+          </li>
+          <li data-setup-step="agent">
+            <span class="setup-mark" aria-hidden="true"></span>
+            <span class="setup-copy">
+              <strong>Agent signal</strong>
+              <small data-setup-detail="agent">Run one Codex or Claude task</small>
+            </span>
+          </li>
+        </ol>
+      </details>
+
       <aside id="ready-notice" class="ready-notice" hidden>
         <div class="activity-notice-copy">
           <span id="ready-copy"></span>
@@ -63,27 +102,32 @@
           </label>
         </div>
 
-        <fieldset class="provider-picker">
-          <legend>Choose a feed</legend>
-          <label>
-            <input type="radio" name="provider" value="youtube">
-            <span>Shorts</span>
-          </label>
-          <label>
-            <input type="radio" name="provider" value="tiktok">
-            <span>TikTok</span>
-          </label>
-          <label>
-            <input type="radio" name="provider" value="instagram">
-            <span>Reels</span>
-          </label>
+        <fieldset class="provider-picker" data-mode="fixed">
+          <legend>Choose feeds</legend>
+          <button type="button" data-provider="youtube" aria-pressed="false">
+            Shorts
+          </button>
+          <button type="button" data-provider="tiktok" aria-pressed="false">
+            TikTok
+          </button>
+          <button type="button" data-provider="instagram" aria-pressed="false">
+            Reels
+          </button>
         </fieldset>
+
+        <label class="permission-row compact-row">
+          <span>
+            <strong>Shuffle feeds</strong>
+            <small>Rotate enabled feeds with each new break</small>
+          </span>
+          <input id="shuffle-feeds" type="checkbox">
+        </label>
 
         <button id="test-feed" class="primary-button" type="button">
           Test connection + feed
         </button>
         <p class="helper">
-          Available when Ready. Opens your feed for 3 seconds, then closes it.
+          Available when Ready. Opens the feed for a 3-second check.
         </p>
         <label class="permission-row">
           <span>

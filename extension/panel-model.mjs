@@ -111,6 +111,47 @@ export function statusPresentation(snapshot, now = Date.now()) {
   };
 }
 
+export function setupPresentation(snapshot) {
+  const settings = snapshot?.settings ?? {};
+  const observedAgents = settings.observedAgents ?? {};
+  const observed = Object.entries(observedAgents)
+    .filter(([, timestamp]) => Number.isFinite(timestamp) && timestamp > 0)
+    .map(([agent]) => agentLabel(agent));
+  const items = [
+    {
+      id: "companion",
+      complete: snapshot?.connectionState === "connected",
+      title: "Local companion",
+      detail:
+        snapshot?.connectionState === "connected"
+          ? "Connected"
+          : "Install or reconnect the companion"
+    },
+    {
+      id: "feed",
+      complete: settings.feedTested === true,
+      title: "Feed check",
+      detail: settings.feedTested
+        ? "Feed opened successfully"
+        : "Open your selected feed once"
+    },
+    {
+      id: "agent",
+      complete: observed.length > 0,
+      title: "Agent signal",
+      detail:
+        observed.length > 0
+          ? `${observed.join(" + ")} detected`
+          : "Run one Codex or Claude task"
+    }
+  ];
+  return {
+    complete: items.every((item) => item.complete),
+    completedCount: items.filter((item) => item.complete).length,
+    items
+  };
+}
+
 export function agentLabel(agent) {
   return agent === "claude-code" ? "Claude Code" : "Codex";
 }

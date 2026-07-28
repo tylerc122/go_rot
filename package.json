@@ -7,6 +7,8 @@
   "scripts": {
     "install:mvp": "node scripts/install.mjs install --all",
     "uninstall:mvp": "node scripts/install.mjs uninstall --all",
+    "install:alpha": "node scripts/install.mjs install --all",
+    "uninstall:alpha": "node scripts/install.mjs uninstall --all",
     "install:alpha:claude": "node scripts/install.mjs install --native && node scripts/install.mjs install --claude",
     "uninstall:alpha:claude": "node scripts/install.mjs uninstall --claude && node scripts/install.mjs uninstall --native",
     "doctor": "node scripts/doctor.mjs",

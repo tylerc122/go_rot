@@ -8,6 +8,7 @@ const events = {
   runtimeMessage: createEvent(),
   windowRemoved: createEvent(),
   windowFocused: createEvent(),
+  windowBoundsChanged: createEvent(),
   command: createEvent(),
   portMessage: createEvent(),
   portDisconnect: createEvent()
@@ -61,6 +62,7 @@ globalThis.chrome = {
   windows: {
     onRemoved: events.windowRemoved,
     onFocusChanged: events.windowFocused,
+    onBoundsChanged: events.windowBoundsChanged,
     async create(options) {
       const id = nextWindowId++;
       const created = { ...options, id, tabs: [{ id: id * 10 }] };
@@ -78,6 +80,26 @@ globalThis.chrome = {
     },
     async getLastFocused() {
       return { left: 10, top: 20, width: 1400, height: 900 };
+    }
+  },
+  system: {
+    display: {
+      async getInfo() {
+        return [
+          {
+            id: "main",
+            isPrimary: true,
+            bounds: { left: 0, top: 0, width: 1728, height: 1117 },
+            workArea: { left: 0, top: 0, width: 1728, height: 1078 }
+          },
+          {
+            id: "side",
+            isPrimary: false,
+            bounds: { left: 1728, top: 0, width: 1440, height: 900 },
+            workArea: { left: 1728, top: 0, width: 1440, height: 860 }
+          }
+        ];
+      }
     }
   },
   commands: {
@@ -625,6 +647,71 @@ test("a Claude idle notification after completion cannot park or block a new fee
   await lifecycle(
     work("work.completed", "codex", "after-idle", "turn-1", "Codex")
   );
+});
+
+test("persists setup evidence, rotates feeds, and remembers bounds", async () => {
+  await events.runtimeMessage.request({ type: "activity.reset" });
+  Object.assign(settings, {
+    shuffleFeeds: true,
+    enabledProviders: ["youtube", "tiktok"],
+    lastShuffledProvider: null,
+    feedTested: false,
+    windowLeft: null,
+    windowTop: null,
+    windowDisplayId: null
+  });
+  settings.observedAgents = { codex: 0, "claude-code": 0 };
+
+  const windowsBefore = createdWindows.length;
+  await lifecycle(work("work.started", "codex", "features-one", "one", "Codex"));
+  await waitFor(() => createdWindows.length === windowsBefore + 1);
+  const first = createdWindows.at(-1);
+  assert.equal(first.url, "https://www.youtube.com/shorts");
+  assert.ok(settings.observedAgents.codex > 0);
+
+  await events.windowBoundsChanged.emit({
+    id: first.id,
+    state: "normal",
+    left: 1840,
+    top: 52,
+    width: 520,
+    height: 760
+  });
+  assert.equal(settings.windowLeft, 1840);
+  assert.equal(settings.windowTop, 52);
+  assert.equal(settings.windowWidth, 520);
+  assert.equal(settings.windowHeight, 760);
+  assert.equal(settings.windowDisplayId, "side");
+
+  await events.runtimeMessage.request({ type: "session.return" });
+  assert.equal(removedWindows.at(-1), first.id);
+  await lifecycle(work("work.completed", "codex", "features-one", "one", "Codex"));
+
+  await lifecycle(
+    work("work.started", "claude-code", "features-two", "two", "Terminal")
+  );
+  await waitFor(() => createdWindows.length === windowsBefore + 2);
+  const second = createdWindows.at(-1);
+  assert.equal(second.url, "https://www.tiktok.com/foryou");
+  assert.equal(second.left, 1840);
+  assert.equal(second.top, 52);
+  assert.equal(second.width, 520);
+  assert.equal(second.height, 760);
+  assert.ok(settings.observedAgents["claude-code"] > 0);
+  await events.runtimeMessage.request({ type: "session.return" });
+  await lifecycle(
+    work("work.completed", "claude-code", "features-two", "two", "Terminal")
+  );
+
+  const testResult = await events.runtimeMessage.request({ type: "feed.test" });
+  assert.equal(testResult.ok, true);
+  assert.equal(settings.feedTested, true);
+  const setupStatus = await events.runtimeMessage.request({ type: "status.get" });
+  assert.equal(setupStatus.settings.feedTested, true);
+  assert.ok(setupStatus.settings.observedAgents.codex > 0);
+  assert.ok(setupStatus.settings.observedAgents["claude-code"] > 0);
+
+  settings.shuffleFeeds = false;
 });
 
 test("clip finishing ignores comment state and closes on a new video", async () => {

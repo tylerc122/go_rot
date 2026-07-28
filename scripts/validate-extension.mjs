@@ -16,6 +16,10 @@ expect(manifest.action?.default_popup === "panel.html", "toolbar popup is missin
 expect(manifest.permissions?.includes("nativeMessaging"), "nativeMessaging permission is missing");
 expect(manifest.permissions?.includes("storage"), "storage permission is missing");
 expect(manifest.permissions?.includes("scripting"), "scripting permission is missing");
+expect(
+  manifest.permissions?.includes("system.display"),
+  "system.display permission is missing"
+);
 expect(!manifest.host_permissions, "host_permissions are not allowed in the MVP");
 expect(!manifest.content_scripts, "content scripts are not allowed in the MVP");
 expect(

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   pauseDeadline,
+  setupPresentation,
   statusPresentation
 } from "../extension/panel-model.mjs";
 
@@ -19,6 +20,29 @@ test("computes fixed and next-day pause deadlines", () => {
   assert.equal(tomorrow.getDate(), 25);
   assert.equal(tomorrow.getHours(), 0);
   assert.equal(tomorrow.getMinutes(), 0);
+});
+
+test("presents setup progress from real readiness evidence", () => {
+  const waiting = setupPresentation({
+    connectionState: "connected",
+    settings: { feedTested: false, observedAgents: {} }
+  });
+  assert.equal(waiting.complete, false);
+  assert.equal(waiting.completedCount, 1);
+  assert.equal(waiting.items.find((item) => item.id === "feed").complete, false);
+
+  const complete = setupPresentation({
+    connectionState: "connected",
+    settings: {
+      feedTested: true,
+      observedAgents: { codex: 100, "claude-code": 0 }
+    }
+  });
+  assert.equal(complete.complete, true);
+  assert.equal(
+    complete.items.find((item) => item.id === "agent").detail,
+    "Codex detected"
+  );
 });
 
 test("presents disabled, paused, active, disconnected, and ready states", () => {

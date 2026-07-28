@@ -44,7 +44,7 @@ label {
 button:focus-visible,
 select:focus-visible,
 input:focus-visible + .switch-track,
-.provider-picker input:focus-visible + span {
+.provider-picker button:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--focus) 28%, transparent);
   outline-offset: 2px;
 }
@@ -201,6 +201,100 @@ h2,
   background: var(--danger);
 }
 
+.setup {
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+}
+
+.setup summary {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 20px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.setup summary::-webkit-details-marker {
+  display: none;
+}
+
+.setup summary > span:first-child,
+.setup-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.setup summary strong,
+.setup-copy strong {
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.setup summary small,
+.setup-copy small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.setup-chevron {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 140ms ease;
+}
+
+.setup[open] .setup-chevron {
+  transform: rotate(225deg) translate(-2px, -2px);
+}
+
+.setup-steps {
+  margin: 0;
+  padding: 0 20px 10px;
+  list-style: none;
+}
+
+.setup-steps li {
+  display: grid;
+  min-height: 43px;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  border-top: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
+}
+
+.setup-mark {
+  display: grid;
+  width: 15px;
+  height: 15px;
+  place-items: center;
+  border: 1px solid #aaa59b;
+  border-radius: 50%;
+}
+
+.setup-steps li[data-complete="true"] .setup-mark {
+  border-color: var(--success);
+  background: var(--success);
+}
+
+.setup-steps li[data-complete="true"] .setup-mark::after {
+  width: 6px;
+  height: 3px;
+  border-bottom: 1.5px solid var(--surface);
+  border-left: 1.5px solid var(--surface);
+  content: "";
+  transform: translateY(-1px) rotate(-45deg);
+}
+
 .status-copy {
   display: flex;
   min-width: 0;
@@ -317,18 +411,7 @@ select {
   white-space: nowrap;
 }
 
-.provider-picker label {
-  cursor: pointer;
-}
-
-.provider-picker input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-}
-
-.provider-picker span {
+.provider-picker button {
   display: grid;
   min-height: 40px;
   place-items: center;
@@ -339,12 +422,30 @@ select {
   font-size: 13px;
   font-weight: 600;
   transition: border-color 130ms ease, color 130ms ease, background 130ms ease;
+  cursor: pointer;
 }
 
-.provider-picker input:checked + span {
+.provider-picker[data-mode="fixed"] button[aria-pressed="true"] {
   border-color: var(--ink);
   background: var(--ink);
   color: var(--surface);
+}
+
+.provider-picker[data-mode="shuffle"] button[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--rule));
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+  color: var(--accent-dark);
+}
+
+.provider-picker[data-mode="shuffle"] button[aria-pressed="true"]::before {
+  margin-right: 5px;
+  color: var(--accent);
+  content: "✓";
+}
+
+.provider-picker[data-mode="shuffle"] button[aria-pressed="true"] {
+  display: flex;
+  justify-content: center;
 }
 
 .primary-button,

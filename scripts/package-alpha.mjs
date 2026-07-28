@@ -28,17 +28,11 @@ const bundle = path.join(temporary, "firsttok");
 const included = [
   "bin",
   "companion",
-  "docs",
   "extension",
   "integrations",
   "scripts",
   "test",
-  "DESIGN.md",
-  "MVP_AUDIT.md",
-  "PRODUCT.md",
-  "README.md",
-  "package.json",
-  "spec.md"
+  "package.json"
 ];
 
 try {
@@ -56,12 +50,16 @@ try {
     startGuide,
     path.join(bundle, "START_HERE.md")
   );
-  if (surface === "claude") {
-    fs.copyFileSync(
-      path.join(root, "docs", "claude-alpha-results.md"),
-      path.join(bundle, "RESULTS.md")
-    );
-  }
+  fs.copyFileSync(
+    path.join(
+      root,
+      "docs",
+      surface === "claude"
+        ? "claude-alpha-results.md"
+        : "friend-alpha-results.md"
+    ),
+    path.join(bundle, "RESULTS.md")
+  );
   fs.writeFileSync(
     path.join(bundle, "ALPHA_BUILD.txt"),
     [

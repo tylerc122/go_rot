@@ -4,6 +4,7 @@ import {
   DEFAULT_SETTINGS,
   clampSettings,
   isTerminalEvent,
+  nextFeedProvider,
   sessionEligibility,
   sessionKey
 } from "../extension/session-controller.mjs";
@@ -22,12 +23,37 @@ test("clamps untrusted settings and falls back to a known provider", () => {
       agents: DEFAULT_SETTINGS.agents,
       pausedUntil: DEFAULT_SETTINGS.pausedUntil,
       provider: "youtube",
+      shuffleFeeds: DEFAULT_SETTINGS.shuffleFeeds,
+      enabledProviders: DEFAULT_SETTINGS.enabledProviders,
+      lastShuffledProvider: DEFAULT_SETTINGS.lastShuffledProvider,
       pauseMedia: DEFAULT_SETTINGS.pauseMedia,
       finishCurrentClip: DEFAULT_SETTINGS.finishCurrentClip,
+      feedTested: DEFAULT_SETTINGS.feedTested,
+      observedAgents: DEFAULT_SETTINGS.observedAgents,
       delayMs: 0,
       windowWidth: 900,
-      windowHeight: DEFAULT_SETTINGS.windowHeight
+      windowHeight: DEFAULT_SETTINGS.windowHeight,
+      windowLeft: null,
+      windowTop: null,
+      windowDisplayId: null
     }
+  );
+});
+
+test("rotates predictably through enabled feeds", () => {
+  const settings = clampSettings({
+    shuffleFeeds: true,
+    enabledProviders: ["youtube", "instagram"],
+    lastShuffledProvider: "youtube"
+  });
+  assert.equal(nextFeedProvider(settings), "instagram");
+  assert.equal(
+    nextFeedProvider({ ...settings, lastShuffledProvider: "instagram" }),
+    "youtube"
+  );
+  assert.equal(
+    nextFeedProvider({ ...settings, shuffleFeeds: false, provider: "tiktok" }),
+    "tiktok"
   );
 });
 

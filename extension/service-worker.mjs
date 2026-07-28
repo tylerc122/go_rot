@@ -2,10 +2,15 @@ import {
   DEFAULT_SETTINGS,
   PROVIDERS,
   clampSettings,
+  nextFeedProvider,
   sessionEligibility,
   sessionKey
 } from "./session-controller.mjs";
 import { SessionRegistry } from "./session-registry.mjs";
+import {
+  captureWindowPlacement,
+  resolveFeedBounds
+} from "./window-placement.mjs";
 
 const NATIVE_HOST = "com.firsttok.companion";
 const registry = new SessionRegistry();
@@ -38,6 +43,17 @@ chrome.windows.onRemoved.addListener(async (windowId) => {
   if (source) {
     focusSource(source, "manual", false);
   }
+  broadcastStatus();
+});
+
+chrome.windows.onBoundsChanged?.addListener(async (window) => {
+  const feed = feedSession;
+  if (!feed || feed.windowId !== window.id || feed.closing) return;
+  const placement = captureWindowPlacement(window, await displayInfo());
+  if (!placement) return;
+  const settings = clampSettings({ ...feed.settings, ...placement });
+  feed.settings = settings;
+  await chrome.storage.local.set(placement);
   broadcastStatus();
 });
 
@@ -139,6 +155,7 @@ async function handleNativeMessage(message) {
 
 async function handleLifecycleEvent(event) {
   if (!event?.type) return;
+  await recordObservedAgent(event);
   const key = sessionKey(event);
 
   if (event.type === "work.started") {
@@ -149,7 +166,8 @@ async function handleLifecycleEvent(event) {
     if (started.kind === "duplicate") return;
 
     if (!feedSession) {
-      scheduleFeed(event, settings);
+      const provider = await selectFeedProvider(settings);
+      scheduleFeed(event, settings, settings.delayMs, provider);
     } else {
       feedSession.anchorEvent = event;
       if (feedSession.state === "finishing") {
@@ -245,12 +263,18 @@ function createTask(key, event) {
   };
 }
 
-function scheduleFeed(event, settings, delayMs = settings.delayMs) {
+function scheduleFeed(
+  event,
+  settings,
+  delayMs = settings.delayMs,
+  provider = settings.provider
+) {
   const feed = {
     id: crypto.randomUUID(),
     state: "waiting",
     anchorEvent: event,
     settings,
+    provider,
     startedAt: Date.now(),
     timerId: null,
     windowId: null,
@@ -284,22 +308,18 @@ async function openFeed(feed) {
     return;
   }
 
-  const provider = PROVIDERS[feed.settings.provider];
-  const display = await activeDisplayBounds();
-  const width = Math.min(feed.settings.windowWidth, display.width);
-  const height = Math.min(feed.settings.windowHeight, display.height);
-  const left = display.left + Math.max(0, display.width - width - 24);
-  const top = display.top + Math.max(0, Math.round((display.height - height) / 2));
+  const provider = PROVIDERS[feed.provider];
+  const bounds = await feedWindowBounds(feed.settings);
 
   feed.state = "opening";
   const feedWindow = await chrome.windows.create({
     url: provider.url,
     type: "popup",
     focused: true,
-    width,
-    height,
-    left,
-    top
+    width: bounds.width,
+    height: bounds.height,
+    left: bounds.left,
+    top: bounds.top
   });
 
   if (feedSession !== feed || feed.state !== "opening") {
@@ -630,14 +650,19 @@ async function handleUiMessage(message) {
 
 async function openTestFeed() {
   const settings = await loadSettings();
-  const provider = PROVIDERS[settings.provider];
+  const selectedProvider = await selectFeedProvider(settings);
+  const provider = PROVIDERS[selectedProvider];
+  const bounds = await feedWindowBounds(settings);
   const feedWindow = await chrome.windows.create({
     url: provider.url,
     type: "popup",
     focused: true,
-    width: settings.windowWidth,
-    height: settings.windowHeight
+    width: bounds.width,
+    height: bounds.height,
+    left: bounds.left,
+    top: bounds.top
   });
+  await chrome.storage.local.set({ feedTested: true });
   if (feedWindow.id !== undefined) {
     setTimeout(() => safeCloseWindow(feedWindow.id), 3500);
   }
@@ -661,6 +686,7 @@ async function statusSnapshot() {
           agent: anchor?.agent ?? null,
           surface: anchor?.surface ?? null,
           state: feed.state,
+          provider: feed.provider,
           startedAt: feed.startedAt,
           userLeft: feed.userLeft
         }
@@ -671,6 +697,7 @@ async function statusSnapshot() {
           agent: anchor?.agent ?? null,
           surface: anchor?.surface ?? null,
           state: feed.state,
+          provider: feed.provider,
           startedAt: feed.startedAt
         }
       : null
@@ -681,14 +708,51 @@ async function loadSettings() {
   return clampSettings(await chrome.storage.local.get(DEFAULT_SETTINGS));
 }
 
-async function activeDisplayBounds() {
-  const current = await chrome.windows.getLastFocused();
-  return {
+async function recordObservedAgent(event) {
+  if (
+    event.type !== "work.started" ||
+    !["codex", "claude-code"].includes(event.agent)
+  ) {
+    return;
+  }
+  const settings = await loadSettings();
+  if (settings.observedAgents[event.agent] > 0) return;
+  await chrome.storage.local.set({
+    observedAgents: {
+      ...settings.observedAgents,
+      [event.agent]: event.timestamp ?? Date.now()
+    }
+  });
+}
+
+async function selectFeedProvider(settings) {
+  const provider = nextFeedProvider(settings);
+  if (settings.shuffleFeeds && settings.lastShuffledProvider !== provider) {
+    await chrome.storage.local.set({ lastShuffledProvider: provider });
+  }
+  return provider;
+}
+
+async function feedWindowBounds(settings) {
+  const anchor = await chrome.windows.getLastFocused();
+  return resolveFeedBounds(settings, await displayInfo(anchor), anchor);
+}
+
+async function displayInfo(anchor = null) {
+  try {
+    const displays = await chrome.system?.display?.getInfo?.();
+    if (Array.isArray(displays) && displays.length > 0) return displays;
+  } catch {
+    // Fall back to the last focused Chrome window below.
+  }
+  const current = anchor ?? (await chrome.windows.getLastFocused());
+  const bounds = {
     left: current.left ?? 0,
     top: current.top ?? 0,
     width: current.width ?? 1440,
     height: current.height ?? 900
   };
+  return [{ id: "fallback", isPrimary: true, bounds, workArea: bounds }];
 }
 
 async function safeCloseWindow(windowId) {
