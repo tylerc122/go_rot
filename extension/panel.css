@@ -422,6 +422,10 @@ h2,
   border-bottom: 1px solid var(--rule);
 }
 
+.feed-section {
+  padding-bottom: 8px;
+}
+
 .section-heading {
   display: flex;
   align-items: center;

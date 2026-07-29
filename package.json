@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Prompt your agent, go rot, and come back when attention is needed.",
+  "description": "Scroll while your agent works",
   "scripts": {
     "install:mvp": "node scripts/install.mjs install --all",
     "uninstall:mvp": "node scripts/install.mjs uninstall --all",
