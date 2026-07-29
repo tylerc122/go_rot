@@ -81,14 +81,14 @@ if (surface !== "claude") {
   console.log("\nACTION  Codex hook approval cannot be checked automatically.");
   console.log(
     codexCli
-      ? `        Run ${shellQuote(codexCli)}, enter "/hooks", and trust FirstTok.`
-      : '        Start Codex CLI, enter "/hooks", and trust the FirstTok hooks.'
+      ? `        Run ${shellQuote(codexCli)}, enter "/hooks", and trust Go Rot.`
+      : '        Start Codex CLI, enter "/hooks", and trust the Go Rot hooks.'
   );
 }
 if (!checks.find((item) => item.label === "Companion connection")?.ok) {
   console.log(
-    '\nNEXT    Open chrome://extensions, reload FirstTok, then open its toolbar button.\n' +
-      '        Continue only when the extension status says "Ready".'
+    '\nNEXT    Open chrome://extensions, reload Go Rot, then open its toolbar button.\n' +
+      '        Continue only when the extension status says "Ready to rot."'
   );
 }
 

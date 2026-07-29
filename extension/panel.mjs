@@ -259,9 +259,9 @@ function render(next) {
     ready: next.backgroundReady ?? 0
   };
   const activityParts = [];
-  if (activity.working > 0) activityParts.push(`${activity.working} working`);
+  if (activity.working > 0) activityParts.push(`${activity.working} cooking`);
   if (activity.attention > 0) activityParts.push(`${activity.attention} needs you`);
-  if (activity.ready > 0) activityParts.push(`${activity.ready} ready`);
+  if (activity.ready > 0) activityParts.push(`${activity.ready} cooked`);
   elements.readyNotice.hidden = activityParts.length === 0;
   elements.readyNotice.dataset.tone =
     activity.attention > 0 ? "attention" : activity.working > 0 ? "working" : "ready";
@@ -290,13 +290,13 @@ async function runFeedTest(button) {
     }
   }
   button.disabled = true;
-  button.textContent = "Opening";
+  button.textContent = "Opening feed";
   const result = await send({ type: "feed.test" });
-  button.textContent = result.ok ? "Feed verified" : "Could not connect";
+  button.textContent = result.ok ? "Feed works" : "Could not connect";
   await refresh();
   setTimeout(() => {
     button.textContent = button === elements.testFeed
-      ? "Test connection + feed"
+      ? "Run feed check"
       : "Test feed";
     button.disabled = snapshot?.connectionState !== "connected";
   }, 2200);

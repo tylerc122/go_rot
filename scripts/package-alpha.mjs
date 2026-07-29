@@ -63,7 +63,7 @@ try {
   fs.writeFileSync(
     path.join(bundle, "ALPHA_BUILD.txt"),
     [
-      `FirstTok version: ${packageJson.version}`,
+      `Go Rot version: ${packageJson.version}`,
       `Package: ${surface === "claude" ? "Claude friend alpha" : "general friend alpha"}`,
       `Source commit: ${sourceCommit()}`,
       `Source state: ${sourceState()}`,

@@ -39,12 +39,12 @@ const receiver = await startClaudeOtelReceiver({
   onEvent(event) {
     fs.appendFileSync(output, `${JSON.stringify(event)}\n`);
     process.stderr.write(
-      `[FirstTok event] ${event.sequence} ${event.eventName}\n`
+      `[Go Rot event] ${event.sequence} ${event.eventName}\n`
     );
   }
 });
 
-process.stderr.write(`FirstTok event capture: ${output}\n`);
+process.stderr.write(`Go Rot event capture: ${output}\n`);
 process.stderr.write(
   "Prompt, response, tool details, tool content, and raw API bodies are disabled.\n"
 );
@@ -77,7 +77,7 @@ const exitCode = await new Promise((resolve) => {
 
 await receiver.close();
 fs.rmSync(temporaryDirectory, { recursive: true, force: true });
-process.stderr.write(`FirstTok event capture complete: ${output}\n`);
+process.stderr.write(`Go Rot event capture complete: ${output}\n`);
 process.exitCode = exitCode;
 
 function parseArguments(args) {

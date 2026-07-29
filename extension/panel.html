@@ -3,21 +3,18 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>FirstTok</title>
+    <title>Go Rot</title>
     <link rel="stylesheet" href="panel.css">
   </head>
   <body>
     <main class="panel">
       <header class="masthead">
         <div class="identity">
-          <div class="mark" aria-hidden="true">F</div>
-          <div>
-            <h1>FirstTok</h1>
-            <p>Scroll while your agent works.</p>
-          </div>
+          <h1><span>GO</span> ROT</h1>
+          <p>Rot responsibly.</p>
         </div>
 
-        <label class="switch" aria-label="Enable FirstTok">
+        <label class="switch" aria-label="Enable Go Rot">
           <input id="enabled" type="checkbox">
           <span class="switch-track" aria-hidden="true"></span>
         </label>
@@ -120,28 +117,37 @@
             <strong>Shuffle feeds</strong>
             <small>Rotate enabled feeds with each new break</small>
           </span>
-          <input id="shuffle-feeds" type="checkbox">
+          <span class="row-switch">
+            <input id="shuffle-feeds" type="checkbox">
+            <span class="row-switch-track" aria-hidden="true"></span>
+          </span>
         </label>
 
         <button id="test-feed" class="primary-button" type="button">
-          Test connection + feed
+          Run feed check
         </button>
         <p class="helper">
-          Available when Ready. Opens the feed for a 3-second check.
+          Opens your feed for three seconds. Very brave.
         </p>
         <label class="permission-row">
           <span>
             <strong>Pause video when parked</strong>
             <small>Optional site access, limited to your selected feed</small>
           </span>
-          <input id="pause-media" type="checkbox">
+          <span class="row-switch">
+            <input id="pause-media" type="checkbox">
+            <span class="row-switch-track" aria-hidden="true"></span>
+          </span>
         </label>
         <label class="permission-row">
           <span>
             <strong>Finish current clip</strong>
             <small>Wait until the playing clip ends when your agent is ready</small>
           </span>
-          <input id="finish-current-clip" type="checkbox">
+          <span class="row-switch">
+            <input id="finish-current-clip" type="checkbox">
+            <span class="row-switch-track" aria-hidden="true"></span>
+          </span>
         </label>
       </section>
 
@@ -172,20 +178,26 @@
             <strong>Claude Code</strong>
             <small>CLI + compatible desktop builds</small>
           </span>
-          <input id="agent-claude" type="checkbox">
+          <span class="row-switch">
+            <input id="agent-claude" type="checkbox">
+            <span class="row-switch-track" aria-hidden="true"></span>
+          </span>
         </label>
         <label class="agent-row">
           <span>
             <strong>Codex</strong>
             <small>CLI + desktop app</small>
           </span>
-          <input id="agent-codex" type="checkbox">
+          <span class="row-switch">
+            <input id="agent-codex" type="checkbox">
+            <span class="row-switch-track" aria-hidden="true"></span>
+          </span>
         </label>
       </section>
 
       <footer class="footer">
         <button id="return" class="secondary-button" type="button" disabled>
-          Close feed and return
+          Back to work
         </button>
         <span class="shortcut">Shortcut <kbd>⌃</kbd><kbd>⇧</kbd><kbd>B</kbd></span>
       </footer>

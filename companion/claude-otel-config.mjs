@@ -59,7 +59,7 @@ export function normalizeClaudeOtelConfig(input) {
     typeof input.token !== "string" ||
     !/^[a-f0-9]{64}$/.test(input.token)
   ) {
-    throw new TypeError("Invalid FirstTok Claude event receiver configuration.");
+    throw new TypeError("Invalid Go Rot Claude event receiver configuration.");
   }
   return {
     version: 1,

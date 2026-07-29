@@ -20,16 +20,16 @@ export function statusPresentation(snapshot, now = Date.now()) {
   if (!settings?.enabled) {
     return {
       tone: "muted",
-      title: "FirstTok is off",
-      detail: "Agent events are ignored until you turn it back on."
+      title: "Go Rot is off",
+      detail: "No feed breaks until you switch it back on."
     };
   }
 
   if (settings.pausedUntil > now) {
     return {
       tone: "paused",
-      title: "Paused",
-      detail: `Resumes ${formatTime(settings.pausedUntil)}.`
+      title: "Rot privileges suspended.",
+      detail: `Back at ${formatTime(settings.pausedUntil)}.`
     };
   }
 
@@ -43,7 +43,7 @@ export function statusPresentation(snapshot, now = Date.now()) {
       title: `${agent} needs you`,
       detail:
         activity.attention === 1
-          ? "Feed parked at the same video."
+          ? "Rot's over. Your video is parked."
           : `${activity.attention} tasks are waiting for input.`
     };
   }
@@ -55,25 +55,25 @@ export function statusPresentation(snapshot, now = Date.now()) {
     if (state === "finishing") {
       return {
         tone: "ready",
-        title: "Agent ready",
-        detail: "Finishing this clip, then returning."
+        title: "Agent cooked.",
+        detail: "Finish this clip or head back now."
       };
     }
     const title =
       activity.working > 1
-        ? `${activity.working} tasks working`
-        : `${agent} is working`;
+        ? `${activity.working} agents cooking`
+        : "Agent has it.";
     return {
       tone: "active",
       title,
       detail:
         state === "active"
-          ? "Your feed is open."
+          ? `${agent} is working. Go be useless for a minute.`
           : state === "waiting"
-            ? "Waiting for the launch delay."
+            ? "Waiting on your delay. Resisting the feed."
             : state === "parked"
-              ? "Feed parked at the same video."
-              : "Opening your feed."
+              ? "Feed parked. Handle your business."
+              : "Opening your feed. Rot responsibly."
     };
   }
 
@@ -82,9 +82,9 @@ export function statusPresentation(snapshot, now = Date.now()) {
       tone: "active",
       title:
         activity.working === 1
-          ? "1 task working"
-          : `${activity.working} tasks working`,
-      detail: "The feed was closed for this round."
+          ? "Still cooking."
+          : `${activity.working} agents cooking`,
+      detail: "Your feed closed for this round."
     };
   }
 
@@ -106,8 +106,8 @@ export function statusPresentation(snapshot, now = Date.now()) {
 
   return {
     tone: "ready",
-    title: "Ready",
-    detail: "Listening for Claude Code and Codex."
+    title: "Ready to rot.",
+    detail: "Prompt Claude Code or Codex."
   };
 }
 
@@ -132,7 +132,7 @@ export function setupPresentation(snapshot) {
       complete: settings.feedTested === true,
       title: "Feed check",
       detail: settings.feedTested
-        ? "Feed opened successfully"
+        ? "Feed works. Huge day."
         : "Open your selected feed once"
     },
     {

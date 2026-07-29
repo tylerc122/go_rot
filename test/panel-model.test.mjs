@@ -48,21 +48,21 @@ test("presents setup progress from real readiness evidence", () => {
 test("presents disabled, paused, active, disconnected, and ready states", () => {
   assert.equal(
     statusPresentation({ settings: { ...readySettings, enabled: false } }).title,
-    "FirstTok is off"
+    "Go Rot is off"
   );
   assert.equal(
     statusPresentation(
       { settings: { ...readySettings, pausedUntil: 2000 } },
       1000
     ).title,
-    "Paused"
+    "Rot privileges suspended."
   );
   assert.equal(
     statusPresentation({
       settings: readySettings,
       activeSession: { agent: "claude-code", state: "active" }
     }).title,
-    "Claude Code is working"
+    "Agent has it."
   );
   assert.deepEqual(
     statusPresentation({
@@ -71,8 +71,8 @@ test("presents disabled, paused, active, disconnected, and ready states", () => 
     }),
     {
       tone: "ready",
-      title: "Agent ready",
-      detail: "Finishing this clip, then returning."
+      title: "Agent cooked.",
+      detail: "Finish this clip or head back now."
     }
   );
   assert.equal(
@@ -96,6 +96,6 @@ test("presents disabled, paused, active, disconnected, and ready states", () => 
       settings: readySettings,
       connectionState: "connected"
     }).title,
-    "Ready"
+    "Ready to rot."
   );
 });

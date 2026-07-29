@@ -435,7 +435,7 @@ async function notifyFocusFailure() {
       "/usr/bin/osascript",
       [
         "-e",
-        'display notification "The feed closed, but the source app could not be restored." with title "FirstTok"'
+        'display notification "The feed closed, but the source app could not be restored." with title "Go Rot"'
       ],
       { timeout: 2_000 }
     );
@@ -452,7 +452,7 @@ async function notifyReady(session) {
       "/usr/bin/osascript",
       [
         "-e",
-        `display notification "${agent} is ready." with title "FirstTok"`
+        `display notification "${agent} cooked." with title "Go Rot"`
       ],
       { timeout: 2_000 }
     );

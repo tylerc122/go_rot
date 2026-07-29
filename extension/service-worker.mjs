@@ -838,13 +838,13 @@ function finishVisibleClip() {
         min-width: 280px;
         max-width: min(420px, calc(100vw - 32px));
         align-items: center;
-        gap: 14px;
-        padding: 11px 12px 11px 15px;
-        border: 1px solid oklch(84% 0.025 70);
-        border-radius: 12px;
-        background: oklch(98% 0.014 75);
-        box-shadow: 0 8px 28px oklch(20% 0.02 40 / 0.24);
-        color: oklch(25% 0.025 40);
+        gap: 12px;
+        padding: 10px 10px 10px 14px;
+        border: 1px solid oklch(72% 0.03 302);
+        border-radius: 10px;
+        background: oklch(95% 0.024 302);
+        box-shadow: 0 8px 28px oklch(20% 0.025 292 / 0.22);
+        color: oklch(23% 0.018 292);
         font: 13px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
       .copy {
@@ -853,22 +853,22 @@ function finishVisibleClip() {
         flex: 1;
         flex-direction: column;
       }
-      strong { font-size: 13px; font-weight: 700; }
-      span { color: oklch(47% 0.025 40); font-size: 12px; }
+      strong { font-size: 13px; font-weight: 750; letter-spacing: -0.01em; }
+      span { color: oklch(48% 0.018 292); font-size: 12px; }
       button {
         min-height: 40px;
         flex: 0 0 auto;
         padding: 0 13px;
-        border: 1px solid oklch(58% 0.18 35);
+        border: 1px solid oklch(23% 0.018 292);
         border-radius: 8px;
-        background: oklch(62% 0.19 35);
-        color: white;
+        background: oklch(23% 0.018 292);
+        color: oklch(97.5% 0.01 302);
         cursor: pointer;
         font: 650 12px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
-      button:hover { background: oklch(57% 0.19 35); }
+      button:hover { background: oklch(30% 0.02 292); }
       button:focus-visible {
-        outline: 3px solid oklch(72% 0.14 45 / 0.45);
+        outline: 3px solid oklch(55% 0.15 302);
         outline-offset: 2px;
       }
     `;
@@ -880,14 +880,14 @@ function finishVisibleClip() {
     const copy = document.createElement("div");
     copy.className = "copy";
     const title = document.createElement("strong");
-    title.textContent = "Agent ready";
+    title.textContent = "Agent cooked";
     const detail = document.createElement("span");
-    detail.textContent = "Finishing this clip";
+    detail.textContent = "Finish this clip, then back to it";
     copy.append(title, detail);
 
     const returnNow = document.createElement("button");
     returnNow.type = "button";
-    returnNow.textContent = "Return now";
+    returnNow.textContent = "Back now";
     notice.append(copy, returnNow);
     shadow.append(style, notice);
     document.documentElement.append(host);

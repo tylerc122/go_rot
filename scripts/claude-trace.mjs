@@ -7,7 +7,7 @@ let state;
 try {
   state = JSON.parse(fs.readFileSync(statePath(), "utf8"));
 } catch {
-  process.stderr.write("No FirstTok lifecycle trace is available yet.\n");
+  process.stderr.write("No Go Rot lifecycle trace is available yet.\n");
   process.exit(1);
 }
 

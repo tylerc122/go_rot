@@ -30,7 +30,7 @@ test("installer merges and removes hooks without overwriting existing settings",
   );
 
   const installResult = runInstaller(target, "install", "--all");
-  assert.match(installResult.stdout, /status says "Ready"/);
+  assert.match(installResult.stdout, /status says "Ready to rot\."/);
   assert.match(installResult.stdout, /enter "\/hooks"/);
   const installed = JSON.parse(fs.readFileSync(claudeSettings, "utf8"));
   assert.equal(installed.model, "existing-model");

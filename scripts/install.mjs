@@ -53,8 +53,8 @@ if (action === "install") {
   console.log("");
   console.log(
     targets.length === 3
-      ? "FirstTok components installed."
-      : `Installed FirstTok component: ${targets.join(", ")}.`
+      ? "Go Rot components installed."
+      : `Installed Go Rot component: ${targets.join(", ")}.`
   );
   if (targets.includes("native")) {
     console.log(
@@ -62,17 +62,17 @@ if (action === "install") {
     );
     console.log(`Expected extension ID: ${extensionId()}`);
     console.log(
-      'Open the FirstTok toolbar button and confirm its status says "Ready".'
+      'Open the Go Rot toolbar button and confirm its status says "Ready to rot."'
     );
   }
   if (targets.includes("codex")) {
     const codexCli = findCodexCli();
     if (codexCli) {
       console.log(`Codex hook approval: ${shellQuote(codexCli)}`);
-      console.log('Then enter "/hooks" and trust the FirstTok hooks.');
+      console.log('Then enter "/hooks" and trust the Go Rot hooks.');
     } else {
       console.log(
-        'Codex requires hook approval: start Codex CLI, enter "/hooks", and trust the FirstTok hooks.'
+        'Codex requires hook approval: start Codex CLI, enter "/hooks", and trust the Go Rot hooks.'
       );
     }
   }
@@ -112,7 +112,7 @@ async function installNativeHost() {
   fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
   writeJson(manifestPath, {
     name: NATIVE_HOST_NAME,
-    description: "FirstTok local lifecycle companion",
+    description: "Go Rot local lifecycle companion",
     path: launcher,
     type: "stdio",
     allowed_origins: [`chrome-extension://${extensionId()}/`]
@@ -188,7 +188,7 @@ function uninstallHooks(provider) {
     removeClaudeDecisionEnvironment(config);
   }
   writeJson(destination, config);
-  console.log(`Removed FirstTok hooks from: ${destination}`);
+  console.log(`Removed Go Rot hooks from: ${destination}`);
 }
 
 function removeFirstTokEntries(entries) {
@@ -211,7 +211,7 @@ function configureClaudeDecisionEvents(settings) {
   if (!receiverConfig) {
     console.log(
       "WARNING Claude native permission tracking was not configured because " +
-        "the FirstTok companion must be installed first."
+        "the Go Rot companion must be installed first."
     );
     return false;
   }
