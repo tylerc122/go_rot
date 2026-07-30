@@ -26,6 +26,7 @@ for (const [asset, width, height, name] of assets) {
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), "go-rot-store-art-"));
   try {
     const destination = path.join(output, name);
+    fs.rmSync(destination, { force: true });
     const url = `${pathToFileURL(source)}?asset=${asset}`;
     const result = spawnSync(
       chrome,
@@ -48,7 +49,7 @@ for (const [asset, width, height, name] of assets) {
       { encoding: "utf8", timeout: 10_000, killSignal: "SIGKILL" }
     );
     if (!fs.existsSync(destination)) {
-      fail(result.stderr.trim() || `Could not render ${name}`);
+      fail(result.stderr.trim() || result.stdout.trim() || `Could not render ${name}`);
     }
     console.log(`Created ${destination}`);
   } finally {

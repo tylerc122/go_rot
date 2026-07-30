@@ -51,12 +51,13 @@ h1 span { color: var(--lilac); }
 
 body[data-asset="screenshot-demo"] .copy,
 body[data-asset="screenshot-demo"] .panel-shot { display: none; }
-body[data-asset="screenshot-demo"] .demo-shot { display: block; width: 100%; height: 100%; padding: 64px 70px; }
-.demo-frame { width: 760px; overflow: hidden; border: 2px solid var(--graphite); border-radius: 13px; box-shadow: 13px 13px 0 var(--graphite); }
-.demo-frame img { display: block; width: 100%; height: 570px; object-fit: cover; }
-.demo-copy { position: absolute; top: 160px; right: 70px; width: 350px; }
-.demo-copy p { margin: 0; font-size: 47px; font-weight: 840; letter-spacing: -0.055em; line-height: 0.96; }
-.demo-copy p + p { margin-top: 24px; color: var(--lilac); }
+body[data-asset="screenshot-demo"] .demo-shot { display: block; width: 100%; height: 100%; padding: 36px 70px 0; }
+.demo-copy { display: flex; width: 1140px; align-items: flex-end; justify-content: space-between; }
+.demo-eyebrow { margin: 0 0 7px; color: var(--lilac); font-size: 14px; font-weight: 790; letter-spacing: 0.075em; text-transform: uppercase; }
+.demo-copy h2 { margin: 0; font-size: 42px; font-weight: 860; letter-spacing: -0.055em; line-height: 1; }
+.demo-return { width: 310px; margin: 0 0 3px; color: var(--lilac); font-size: 22px; font-weight: 720; line-height: 1.15; }
+.demo-frame { width: 1140px; margin-top: 24px; overflow: hidden; border: 2px solid var(--graphite); border-radius: 13px; background: var(--graphite); box-shadow: 13px 13px 0 var(--graphite); }
+.demo-frame img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
 
 body[data-asset="promo-small"] .copy,
 body[data-asset="promo-small"] .panel-shot,
@@ -71,6 +72,7 @@ body[data-asset="promo-marquee"] .promo { display: flex; position: absolute; ins
 .promo strong { font-size: 58px; font-weight: 880; letter-spacing: -0.07em; line-height: 0.9; }
 .promo span { margin-top: 12px; color: var(--lilac-bright); font-size: 16px; font-weight: 690; letter-spacing: 0.04em; }
 body[data-asset="promo-small"] .promo { gap: 15px; }
+body[data-asset="promo-small"] .promo > * { transform: translateX(-30px); }
 body[data-asset="promo-small"] .promo img { width: 66px; height: 66px; }
 body[data-asset="promo-small"] .promo strong { font-size: 42px; }
 body[data-asset="promo-small"] .promo span { margin-top: 8px; font-size: 12px; }
