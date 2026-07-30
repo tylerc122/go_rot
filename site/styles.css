@@ -246,8 +246,7 @@ h1 span {
   animation: status-pulse 1.8s ease-in-out infinite;
 }
 
-.download-button,
-.chrome-button {
+.download-button {
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -276,20 +275,12 @@ h1 span {
   box-shadow: 0 7px 0 oklch(53% 0.14 302 / 0.45);
 }
 
-.chrome-button {
-  padding: 0 14px 0 18px;
-  background: transparent;
-  color: var(--graphite);
-}
-
-.download-button[aria-disabled="true"],
-.chrome-button[aria-disabled="true"] {
+.download-button[aria-disabled="true"] {
   cursor: default;
   opacity: 0.66;
 }
 
-.download-button:not([aria-disabled="true"]),
-.chrome-button:not([aria-disabled="true"]) {
+.download-button:not([aria-disabled="true"]) {
   cursor: pointer;
 }
 
@@ -299,22 +290,16 @@ h1 span {
   transform: translateY(-3px) scale(1.012);
 }
 
-.chrome-button:not([aria-disabled="true"]):hover {
-  background: var(--graphite);
-  box-shadow: 0 7px 0 oklch(53% 0.14 302 / 0.4);
-  color: var(--paper);
-  transform: translateY(-3px) scale(1.012);
-}
-
-.download-button:not([aria-disabled="true"]):active,
-.chrome-button:not([aria-disabled="true"]):active {
+.download-button:not([aria-disabled="true"]):active {
   box-shadow: 0 2px 0 oklch(53% 0.14 302 / 0.4);
   transform: translateY(3px) scale(0.985);
 }
 
 .download-button svg {
-  width: 18px;
-  height: 18px;
+  flex: 0 0 auto;
+  width: 19px;
+  height: 22px;
+  overflow: visible;
   fill: currentColor;
   transition: transform 180ms var(--ease-out);
 }
@@ -740,8 +725,7 @@ h1 span {
     width: 100%;
   }
 
-  .download-button,
-  .chrome-button {
+  .download-button {
     flex: 1 1 220px;
     justify-content: center;
   }

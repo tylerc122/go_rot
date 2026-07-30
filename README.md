@@ -13,9 +13,8 @@ your prompts, answers, source code, cookies, or feed content.
 
 Get Go Rot from [gorot.dev](https://gorot.dev):
 
-1. Install the Mac app.
-2. Open **Go Rot** and choose **Install or repair setup**.
-3. Add the Chrome extension.
+1. Download and install the Mac app.
+2. Open **Go Rot**, choose **Install or repair setup**, then **Add to Chrome**.
 
 Go Rot supports macOS 13 or newer, Google Chrome, Codex, and Claude Code.
 The Mac app includes everything it needs. If something does not connect, see

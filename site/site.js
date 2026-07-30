@@ -43,15 +43,11 @@ async function configureReleaseLinks() {
     const response = await fetch("release.json", { cache: "no-store" });
     if (!response.ok) return;
     const release = await response.json();
-    const links = {
-      mac: release.macDownloadUrl,
-      chrome: release.chromeStoreUrl,
-    };
+    const requiredUrls = [release.macDownloadUrl, release.chromeStoreUrl];
 
-    if (!Object.values(links).every(isHttpsUrl)) return;
+    if (!requiredUrls.every(isHttpsUrl)) return;
 
-    enableReleaseLink("mac", links.mac);
-    enableReleaseLink("chrome", links.chrome);
+    enableReleaseLink("installer", release.macDownloadUrl);
     document.querySelector("[data-release-status]")?.setAttribute("hidden", "");
   } catch {
     // Local file previews cannot fetch release.json. Disabled links remain clear.
