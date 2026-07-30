@@ -12,7 +12,7 @@ import {
   resolveFeedBounds
 } from "./window-placement.mjs";
 
-const NATIVE_HOST = "com.firsttok.companion";
+const NATIVE_HOST = "dev.gorot.companion";
 const registry = new SessionRegistry();
 let feedSession = null;
 let nativePort = null;
@@ -574,6 +574,7 @@ function notifyReady(event) {
     agent: event.agent,
     sessionId: event.sessionId,
     turnId: event.turnId,
+    sourceApp: event.sourceApp,
     final: true
   });
 }
@@ -786,7 +787,7 @@ async function setFeedPlayback(feed, paused) {
 }
 
 function togglePagePlayback(paused) {
-  const marker = "firsttokResumePlayback";
+  const marker = "goRotResumePlayback";
   for (const video of document.querySelectorAll("video")) {
     if (paused) {
       if (!video.paused) {
@@ -803,13 +804,13 @@ function togglePagePlayback(paused) {
 }
 
 function cancelFinishClipOverlay() {
-  document.dispatchEvent(new CustomEvent("firsttok:cancel-finish-clip"));
-  document.getElementById("firsttok-finish-clip")?.remove();
+  document.dispatchEvent(new CustomEvent("go-rot:cancel-finish-clip"));
+  document.getElementById("go-rot-finish-clip")?.remove();
 }
 
 function finishVisibleClip() {
-  const overlayId = "firsttok-finish-clip";
-  const cancelEvent = "firsttok:cancel-finish-clip";
+  const overlayId = "go-rot-finish-clip";
+  const cancelEvent = "go-rot:cancel-finish-clip";
   document.getElementById(overlayId)?.remove();
 
   let video = findVisiblePlayingVideo();

@@ -19,8 +19,11 @@ const projectRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   ".."
 );
-const targetHome = process.env.FIRSTTOK_HOME
-  ? path.resolve(process.env.FIRSTTOK_HOME)
+const productionAppBundle = process.env.GO_ROT_APP_BUNDLE
+  ? path.resolve(process.env.GO_ROT_APP_BUNDLE)
+  : null;
+const targetHome = process.env.GO_ROT_HOME
+  ? path.resolve(process.env.GO_ROT_HOME)
   : os.homedir();
 const [action = "install", target = "--all"] = process.argv.slice(2);
 const targets =
@@ -57,9 +60,15 @@ if (action === "install") {
       : `Installed Go Rot component: ${targets.join(", ")}.`
   );
   if (targets.includes("native")) {
-    console.log(
-      `Load this unpacked extension in Chrome: ${path.join(projectRoot, "extension")}`
-    );
+    if (productionAppBundle) {
+      console.log(
+        `Chrome extension: https://chromewebstore.google.com/detail/${extensionId()}`
+      );
+    } else {
+      console.log(
+        `Load this unpacked extension in Chrome: ${path.join(projectRoot, "extension")}`
+      );
+    }
     console.log(`Expected extension ID: ${extensionId()}`);
     console.log(
       'Open the Go Rot toolbar button and confirm its status says "Ready to rot."'
@@ -80,7 +89,7 @@ if (action === "install") {
 
 async function installNativeHost() {
   if (process.platform !== "darwin") {
-    fail("The MVP installer currently supports macOS only.");
+    fail("The Go Rot installer currently supports macOS only.");
   }
   let receiverConfig = readClaudeOtelConfig(targetHome);
   if (!receiverConfig) {
@@ -91,23 +100,27 @@ async function installNativeHost() {
   });
   writeJson(claudeOtelConfigPath(targetHome), receiverConfig);
 
-  const launcher = installedNativeLauncherPath();
-  fs.mkdirSync(path.dirname(launcher), { recursive: true });
-  fs.writeFileSync(
-    launcher,
-    [
-      "#!/bin/sh",
-      'if [ "$1" = "--firsttok-launch-check" ]; then',
-      `  exec ${shellQuote(process.execPath)} --version`,
-      "fi",
-      `exec ${shellQuote(process.execPath)} ${shellQuote(
-        path.join(projectRoot, "companion", "native-host.mjs")
-      )}`,
-      ""
-    ].join("\n"),
-    { mode: 0o700 }
-  );
-  fs.chmodSync(launcher, 0o700);
+  const launcher = nativeLauncherPath();
+  if (productionAppBundle) {
+    requireExecutable(launcher, "bundled native host");
+  } else {
+    fs.mkdirSync(path.dirname(launcher), { recursive: true });
+    fs.writeFileSync(
+      launcher,
+      [
+        "#!/bin/sh",
+        'if [ "$1" = "--go-rot-launch-check" ]; then',
+        `  exec ${shellQuote(process.execPath)} --version`,
+        "fi",
+        `exec ${shellQuote(process.execPath)} ${shellQuote(
+          path.join(projectRoot, "companion", "native-host.mjs")
+        )}`,
+        ""
+      ].join("\n"),
+      { mode: 0o700 }
+    );
+    fs.chmodSync(launcher, 0o700);
+  }
   const manifestPath = nativeManifestPath();
   fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
   writeJson(manifestPath, {
@@ -155,7 +168,7 @@ function installHooks(provider) {
 
   for (const event of events) {
     config.hooks[event] ??= [];
-    removeFirstTokEntries(config.hooks[event]);
+    removeGoRotEntries(config.hooks[event]);
     config.hooks[event].push({
       hooks: [
         {
@@ -180,7 +193,7 @@ function uninstallHooks(provider) {
   if (!config) return;
   if (config.hooks) {
     for (const [event, entries] of Object.entries(config.hooks)) {
-      removeFirstTokEntries(entries);
+      removeGoRotEntries(entries);
       if (entries.length === 0) delete config.hooks[event];
     }
   }
@@ -191,17 +204,17 @@ function uninstallHooks(provider) {
   console.log(`Removed Go Rot hooks from: ${destination}`);
 }
 
-function removeFirstTokEntries(entries) {
+function removeGoRotEntries(entries) {
   if (!Array.isArray(entries)) return;
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const serialized = JSON.stringify(entries[index]);
-    if (serialized.includes("FIRSTTOK_HOOK")) entries.splice(index, 1);
+    if (serialized.includes("GO_ROT_HOOK")) entries.splice(index, 1);
   }
 }
 
 function hookCommand(provider) {
-  const hookPath = path.join(projectRoot, "bin", "firsttok-hook.mjs");
-  return `FIRSTTOK_HOOK=1 ${shellQuote(process.execPath)} ${shellQuote(
+  const hookPath = path.join(projectRoot, "bin", "go-rot-hook.mjs");
+  return `GO_ROT_HOOK=1 ${shellQuote(process.execPath)} ${shellQuote(
     hookPath
   )} --provider ${provider}`;
 }
@@ -291,9 +304,28 @@ function installedNativeLauncherPath() {
     targetHome,
     "Library",
     "Application Support",
-    "FirstTok",
-    "firsttok-native-host"
+    "Go Rot",
+    "go-rot-native-host"
   );
+}
+
+function nativeLauncherPath() {
+  return productionAppBundle
+    ? path.join(
+        productionAppBundle,
+        "Contents",
+        "MacOS",
+        "go-rot-native-host"
+      )
+    : installedNativeLauncherPath();
+}
+
+function requireExecutable(filePath, label) {
+  try {
+    fs.accessSync(filePath, fs.constants.X_OK);
+  } catch {
+    fail(`Could not find ${label}: ${filePath}`);
+  }
 }
 
 async function findAvailableLoopbackPort() {
@@ -335,6 +367,11 @@ function findCodexCli() {
 }
 
 function extensionId() {
+  if (productionAppBundle) {
+    return readJson(
+      path.join(projectRoot, "release", "release-contract.json")
+    ).identifiers.chromeExtension;
+  }
   const manifest = readJson(path.join(projectRoot, "extension", "manifest.json"));
   const publicKey = Buffer.from(manifest.key, "base64");
   const digest = crypto.createHash("sha256").update(publicKey).digest();
@@ -354,7 +391,7 @@ function readJson(filePath, fallback) {
 }
 
 function writeJson(filePath, value) {
-  const temporary = `${filePath}.firsttok.tmp`;
+  const temporary = `${filePath}.go-rot.tmp`;
   fs.writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, {
     mode: 0o600
   });

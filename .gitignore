@@ -1,1 +1,11 @@
 dist/
+.release-cache/
+.vercel/
+.env*
+
+# Local product and release notes; README.md is the public source of truth.
+/DESIGN.md
+/MVP_AUDIT.md
+/PRODUCT.md
+/spec.md
+/docs/

@@ -164,6 +164,12 @@ h1 span {
   margin-top: clamp(26px, 3vw, 46px);
 }
 
+.action-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .download-button {
   display: inline-flex;
   align-items: center;
@@ -179,6 +185,38 @@ h1 span {
   letter-spacing: -0.015em;
   opacity: 1;
   box-shadow: 0 7px 0 oklch(53% 0.14 302 / 0.45);
+  text-decoration: none;
+}
+
+.chrome-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 56px;
+  gap: 10px;
+  padding: 0 14px 0 18px;
+  border: 1px solid var(--graphite);
+  border-radius: 11px;
+  color: var(--graphite);
+  font-weight: 760;
+  letter-spacing: -0.015em;
+  text-decoration: none;
+}
+
+.download-button[aria-disabled="true"],
+.chrome-button[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.66;
+}
+
+.download-button:not([aria-disabled="true"]),
+.chrome-button:not([aria-disabled="true"]) {
+  cursor: pointer;
+  transition: transform 160ms var(--ease-out);
+}
+
+.download-button:not([aria-disabled="true"]):hover,
+.chrome-button:not([aria-disabled="true"]):hover {
+  transform: translateY(-2px);
 }
 
 .download-button svg {
@@ -187,7 +225,8 @@ h1 span {
   fill: currentColor;
 }
 
-.download-button small {
+.download-button small,
+.chrome-button small {
   padding: 5px 7px;
   border-radius: 6px;
   background: var(--lilac-bright);
@@ -329,7 +368,7 @@ h1 span {
 
 .install-strip {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   min-height: 82px;
   gap: clamp(24px, 4vw, 72px);
@@ -345,6 +384,22 @@ h1 span {
   font-weight: 730;
   letter-spacing: 0.055em;
   text-transform: uppercase;
+}
+
+.legal-links {
+  display: flex;
+  gap: 12px;
+  font-size: 0.72rem;
+  font-weight: 680;
+}
+
+.legal-links a {
+  color: oklch(81% 0.025 302);
+  text-underline-offset: 3px;
+}
+
+.legal-links a:hover {
+  color: var(--paper);
 }
 
 .strip-label {
@@ -514,6 +569,10 @@ h1 span {
     max-width: 22rem;
     text-align: left;
   }
+
+  .legal-links {
+    justify-self: start;
+  }
 }
 
 @media (max-width: 620px) {
@@ -543,7 +602,16 @@ h1 span {
   }
 
   .download-button {
+    justify-content: center;
+  }
+
+  .action-buttons {
     width: 100%;
+  }
+
+  .download-button,
+  .chrome-button {
+    flex: 1 1 220px;
     justify-content: center;
   }
 

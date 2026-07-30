@@ -76,8 +76,8 @@ export function lifecycleEventFromHook(input, options) {
 }
 
 export function detectSurface(agent, env = process.env, input = {}) {
-  if (env.FIRSTTOK_SURFACE === "cli" || env.FIRSTTOK_SURFACE === "desktop") {
-    return env.FIRSTTOK_SURFACE;
+  if (env.GO_ROT_SURFACE === "cli" || env.GO_ROT_SURFACE === "desktop") {
+    return env.GO_ROT_SURFACE;
   }
   const clientId = String(input.client_id ?? input.clientId ?? "").toLowerCase();
   if (/(desktop|codex[_-]?app|chatgpt|claude[_-]?app)/.test(clientId)) {
@@ -93,8 +93,8 @@ export function detectSurface(agent, env = process.env, input = {}) {
 }
 
 export function detectSourceApp(agent, surface, env = process.env) {
-  if (env.FIRSTTOK_SOURCE_APP) {
-    return env.FIRSTTOK_SOURCE_APP;
+  if (env.GO_ROT_SOURCE_APP) {
+    return env.GO_ROT_SOURCE_APP;
   }
   if (surface === "desktop") {
     return agent === "claude-code" ? "Claude" : "Codex";

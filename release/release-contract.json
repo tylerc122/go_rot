@@ -1,0 +1,51 @@
+{
+  "productName": "Go Rot",
+  "version": "0.1.0",
+  "artifactSlug": "go-rot",
+  "delivery": {
+    "format": "signed-notarized-pkg",
+    "artifactName": "go-rot-macos-v0.1.0.pkg",
+    "applicationPath": "/Applications/Go Rot.app",
+    "bundleRuntime": true,
+    "architectures": [
+      "arm64",
+      "x86_64"
+    ],
+    "minimumMacOS": "13.0"
+  },
+  "runtime": {
+    "name": "node",
+    "version": "24.18.0",
+    "baseUrl": "https://nodejs.org/dist/v24.18.0",
+    "archives": {
+      "arm64": {
+        "file": "node-v24.18.0-darwin-arm64.tar.gz",
+        "sha256": "e1a97e14c99c803e96c7339403282ea05a499c32f8d83defe9ef5ec66f979ed1"
+      },
+      "x86_64": {
+        "file": "node-v24.18.0-darwin-x64.tar.gz",
+        "sha256": "dfd0dbd3e721503434df7b7205e719f61b3a3a31b2bcf9729b8b91fea240f080"
+      }
+    }
+  },
+  "identifiers": {
+    "appBundle": "dev.gorot.app",
+    "installerPackage": "dev.gorot.pkg",
+    "nativeMessagingHost": "dev.gorot.companion",
+    "chromeExtension": "lgjmpjcoofgohfakbjbebakgfeianloj",
+    "chromeExtensionDevelopment": "kdioecoelofnlhihkiadpmknlfdmmopn"
+  },
+  "executables": {
+    "application": "go-rot",
+    "nativeHost": "go-rot-native-host",
+    "doctor": "go-rot-doctor",
+    "uninstaller": "uninstall-go-rot"
+  },
+  "installLocations": {
+    "nativeHostManifest": "~/Library/Application Support/Google/Chrome/NativeMessagingHosts/dev.gorot.companion.json",
+    "codexHooks": "~/.codex/hooks.json",
+    "claudeSettings": "~/.claude/settings.json",
+    "supportDirectory": "~/Library/Application Support/Go Rot",
+    "developmentNativeHost": "~/Library/Application Support/Go Rot/go-rot-native-host"
+  }
+}

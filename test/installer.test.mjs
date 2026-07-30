@@ -13,9 +13,12 @@ import {
 } from "../companion/claude-otel-config.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const releaseContract = JSON.parse(
+  fs.readFileSync(path.join(root, "release", "release-contract.json"), "utf8")
+);
 
 test("installer merges and removes hooks without overwriting existing settings", () => {
-  const target = fs.mkdtempSync(path.join(os.tmpdir(), "firsttok-install-"));
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), "go-rot-install-"));
   const claudeSettings = path.join(target, ".claude", "settings.json");
   fs.mkdirSync(path.dirname(claudeSettings), { recursive: true });
   fs.writeFileSync(
@@ -36,12 +39,12 @@ test("installer merges and removes hooks without overwriting existing settings",
   assert.equal(installed.model, "existing-model");
   assert.equal(installed.hooks.Stop.length, 2);
   assert.ok(installed.hooks.PreToolUse);
-  assert.match(JSON.stringify(installed), /FIRSTTOK_HOOK/);
+  assert.match(JSON.stringify(installed), /GO_ROT_HOOK/);
   const claudePermissionHook =
     installed.hooks.PermissionRequest[0].hooks[0];
   assert.match(
     claudePermissionHook.command,
-    /firsttok-hook\.mjs/
+    /go-rot-hook\.mjs/
   );
   assert.match(claudePermissionHook.command, /--provider claude-code/);
   assert.equal(claudePermissionHook.timeout, 2);
@@ -67,7 +70,7 @@ test("installer merges and removes hooks without overwriting existing settings",
       env: {
         ...process.env,
         PATH: "/usr/bin:/bin:/usr/sbin:/sbin",
-        FIRSTTOK_RUNTIME_DIR: path.join(target, "missing-companion")
+        GO_ROT_RUNTIME_DIR: path.join(target, "missing-companion")
       },
       input: JSON.stringify({
         hook_event_name: "PermissionRequest",
@@ -97,7 +100,7 @@ test("installer merges and removes hooks without overwriting existing settings",
     env: {
       ...process.env,
       PATH: "/usr/bin:/bin:/usr/sbin:/sbin",
-      FIRSTTOK_RUNTIME_DIR: path.join(target, "missing-companion")
+      GO_ROT_RUNTIME_DIR: path.join(target, "missing-companion")
     },
     input: JSON.stringify({
       hook_event_name: "UserPromptSubmit",
@@ -117,7 +120,7 @@ test("installer merges and removes hooks without overwriting existing settings",
         "Google",
         "Chrome",
         "NativeMessagingHosts",
-        "com.firsttok.companion.json"
+        "dev.gorot.companion.json"
       ),
       "utf8"
     )
@@ -138,7 +141,7 @@ test("installer merges and removes hooks without overwriting existing settings",
   const reinstalled = JSON.parse(fs.readFileSync(claudeSettings, "utf8"));
   assert.equal(
     reinstalled.hooks.PermissionRequest.filter((entry) =>
-      JSON.stringify(entry).includes("FIRSTTOK_HOOK")
+      JSON.stringify(entry).includes("GO_ROT_HOOK")
     ).length,
     1
   );
@@ -148,13 +151,13 @@ test("installer merges and removes hooks without overwriting existing settings",
   assert.equal(removed.model, "existing-model");
   assert.deepEqual(removed.env, { EXISTING_SETTING: "preserved" });
   assert.equal(removed.hooks.Stop.length, 1);
-  assert.doesNotMatch(JSON.stringify(removed), /FIRSTTOK_HOOK/);
+  assert.doesNotMatch(JSON.stringify(removed), /GO_ROT_HOOK/);
   assert.equal(fs.existsSync(nativeManifest.path), false);
   assert.equal(fs.existsSync(claudeOtelConfigPath(target)), false);
 });
 
 test("installer refuses to replace an existing Claude telemetry destination", () => {
-  const target = fs.mkdtempSync(path.join(os.tmpdir(), "firsttok-conflict-"));
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), "go-rot-conflict-"));
   const claudeSettings = path.join(target, ".claude", "settings.json");
   fs.mkdirSync(path.dirname(claudeSettings), { recursive: true });
   fs.writeFileSync(
@@ -180,7 +183,7 @@ test("installer refuses to replace an existing Claude telemetry destination", ()
   );
   assert.equal(installed.env.OTEL_LOGS_EXPORTER, "otlp");
   assert.equal(installed.env.OTEL_METRICS_EXPORTER, undefined);
-  assert.match(JSON.stringify(installed.hooks), /FIRSTTOK_HOOK/);
+  assert.match(JSON.stringify(installed.hooks), /GO_ROT_HOOK/);
 
   runInstaller(target, "uninstall", "--claude");
   const removed = JSON.parse(fs.readFileSync(claudeSettings, "utf8"));
@@ -188,11 +191,11 @@ test("installer refuses to replace an existing Claude telemetry destination", ()
     removed.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT,
     "https://telemetry.example.test/v1/logs"
   );
-  assert.doesNotMatch(JSON.stringify(removed.hooks), /FIRSTTOK_HOOK/);
+  assert.doesNotMatch(JSON.stringify(removed.hooks), /GO_ROT_HOOK/);
 });
 
 test("installer preserves an existing Claude telemetry headers helper", () => {
-  const target = fs.mkdtempSync(path.join(os.tmpdir(), "firsttok-helper-conflict-"));
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), "go-rot-helper-conflict-"));
   const claudeSettings = path.join(target, ".claude", "settings.json");
   fs.mkdirSync(path.dirname(claudeSettings), { recursive: true });
   fs.writeFileSync(
@@ -212,11 +215,11 @@ test("installer preserves an existing Claude telemetry headers helper", () => {
     "/usr/local/bin/existing-headers-helper"
   );
   assert.equal(installed.env, undefined);
-  assert.match(JSON.stringify(installed.hooks), /FIRSTTOK_HOOK/);
+  assert.match(JSON.stringify(installed.hooks), /GO_ROT_HOOK/);
 });
 
 test("installed native launcher resolves Node with Chrome's sparse GUI PATH", () => {
-  const target = fs.mkdtempSync(path.join(os.tmpdir(), "firsttok-gui-path-"));
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), "go-rot-gui-path-"));
   runInstaller(target, "install", "--native");
 
   const manifest = JSON.parse(
@@ -228,12 +231,12 @@ test("installed native launcher resolves Node with Chrome's sparse GUI PATH", ()
         "Google",
         "Chrome",
         "NativeMessagingHosts",
-        "com.firsttok.companion.json"
+        "dev.gorot.companion.json"
       ),
       "utf8"
     )
   );
-  const probe = spawnSync(manifest.path, ["--firsttok-launch-check"], {
+  const probe = spawnSync(manifest.path, ["--go-rot-launch-check"], {
     cwd: root,
     env: {
       ...process.env,
@@ -245,18 +248,68 @@ test("installed native launcher resolves Node with Chrome's sparse GUI PATH", ()
   assert.match(probe.stdout, /^v\d+\./);
 });
 
-function runInstaller(home, action, target) {
+test("production install points Chrome at the bundled host and public extension", () => {
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), "go-rot-production-"));
+  const appBundle = path.join(target, "Applications", "Go Rot.app");
+  const bundledHost = path.join(
+    appBundle,
+    "Contents",
+    "MacOS",
+    "go-rot-native-host"
+  );
+  fs.mkdirSync(path.dirname(bundledHost), { recursive: true });
+  fs.writeFileSync(bundledHost, "#!/bin/sh\nexec \"$GO_ROT_NODE\" --version\n", {
+    mode: 0o755
+  });
+
+  runInstaller(target, "install", "--native", { GO_ROT_APP_BUNDLE: appBundle });
+  const manifest = JSON.parse(
+    fs.readFileSync(
+      path.join(
+        target,
+        "Library",
+        "Application Support",
+        "Google",
+        "Chrome",
+        "NativeMessagingHosts",
+        "dev.gorot.companion.json"
+      ),
+      "utf8"
+    )
+  );
+  assert.equal(manifest.path, bundledHost);
+  assert.deepEqual(manifest.allowed_origins, [
+    `chrome-extension://${releaseContract.identifiers.chromeExtension}/`
+  ]);
+
+  runInstaller(target, "uninstall", "--native", { GO_ROT_APP_BUNDLE: appBundle });
+  assert.equal(fs.existsSync(nativeManifestPath(target)), false);
+});
+
+function runInstaller(home, action, target, environment = {}) {
   const result = spawnSync(
     process.execPath,
     [path.join(root, "scripts", "install.mjs"), action, target],
     {
       cwd: root,
-      env: { ...process.env, FIRSTTOK_HOME: home },
+      env: { ...process.env, GO_ROT_HOME: home, ...environment },
       encoding: "utf8"
     }
   );
   assert.equal(result.status, 0, result.stderr || result.stdout);
   return result;
+}
+
+function nativeManifestPath(home) {
+  return path.join(
+    home,
+    "Library",
+    "Application Support",
+    "Google",
+    "Chrome",
+    "NativeMessagingHosts",
+    "dev.gorot.companion.json"
+  );
 }
 
 function escapeRegExp(value) {

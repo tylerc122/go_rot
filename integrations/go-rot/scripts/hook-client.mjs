@@ -40,8 +40,8 @@ function mapHook(payload) {
 }
 
 function detectSurface() {
-  if (process.env.FIRSTTOK_SURFACE === "cli") return "cli";
-  if (process.env.FIRSTTOK_SURFACE === "desktop") return "desktop";
+  if (process.env.GO_ROT_SURFACE === "cli") return "cli";
+  if (process.env.GO_ROT_SURFACE === "desktop") return "desktop";
   const clientId = String(input.client_id ?? input.clientId ?? "").toLowerCase();
   if (/(desktop|codex[_-]?app|chatgpt)/.test(clientId)) return "desktop";
   if (/(cli|tui|terminal)/.test(clientId)) return "cli";
@@ -51,8 +51,8 @@ function detectSurface() {
 }
 
 function detectSourceApp(surface) {
-  if (process.env.FIRSTTOK_SOURCE_APP) {
-    return process.env.FIRSTTOK_SOURCE_APP;
+  if (process.env.GO_ROT_SOURCE_APP) {
+    return process.env.GO_ROT_SOURCE_APP;
   }
   if (surface === "desktop") return "Codex";
 
@@ -67,8 +67,8 @@ function detectSourceApp(surface) {
 
 function runtimeSocketPath() {
   const directory =
-    process.env.FIRSTTOK_RUNTIME_DIR ??
-    path.join(os.tmpdir(), `firsttok-${process.getuid?.() ?? "user"}`);
+    process.env.GO_ROT_RUNTIME_DIR ??
+    path.join(os.tmpdir(), `go-rot-${process.getuid?.() ?? "user"}`);
   return path.join(directory, "companion.sock");
 }
 

@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "FIRSTTOK_HOOK=1 \"$PLUGIN_ROOT/scripts/run-hook\"",
+            "command": "GO_ROT_HOOK=1 \"$PLUGIN_ROOT/scripts/run-hook\"",
             "timeout": 2
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "FIRSTTOK_HOOK=1 \"$PLUGIN_ROOT/scripts/run-hook\"",
+            "command": "GO_ROT_HOOK=1 \"$PLUGIN_ROOT/scripts/run-hook\"",
             "timeout": 2
           }
         ]
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "FIRSTTOK_HOOK=1 \"$PLUGIN_ROOT/scripts/run-hook\"",
+            "command": "GO_ROT_HOOK=1 \"$PLUGIN_ROOT/scripts/run-hook\"",
             "timeout": 2
           }
         ]
@@ -38,7 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "FIRSTTOK_HOOK=1 \"$PLUGIN_ROOT/scripts/run-hook\"",
+            "command": "GO_ROT_HOOK=1 \"$PLUGIN_ROOT/scripts/run-hook\"",
             "timeout": 2
           }
         ]
@@ -49,7 +49,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "FIRSTTOK_HOOK=1 \"$PLUGIN_ROOT/scripts/run-hook\"",
+            "command": "GO_ROT_HOOK=1 \"$PLUGIN_ROOT/scripts/run-hook\"",
             "timeout": 2
           }
         ]
@@ -60,7 +60,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "FIRSTTOK_HOOK=1 \"$PLUGIN_ROOT/scripts/run-hook\"",
+            "command": "GO_ROT_HOOK=1 \"$PLUGIN_ROOT/scripts/run-hook\"",
             "timeout": 2
           }
         ]

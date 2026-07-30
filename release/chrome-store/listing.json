@@ -1,0 +1,26 @@
+{
+  "language": "en",
+  "name": "Go Rot",
+  "summary": "Open your short-form feed while Codex or Claude works, then return when the agent needs you.",
+  "category": "Productivity",
+  "singlePurpose": "Go Rot hands attention between a supported coding agent and the user's chosen short-form feed.",
+  "homepagePath": "/",
+  "privacyPolicyPath": "/privacy.html",
+  "supportPath": "/support.html",
+  "supportFallback": "https://github.com/tylerc122/go_rot/issues",
+  "visibility": "public",
+  "publishMode": "staged",
+  "dataUse": {
+    "collectsUserData": false,
+    "sellsUserData": false,
+    "usesRemoteCode": false,
+    "usesAnalytics": false
+  },
+  "permissions": {
+    "nativeMessaging": "Connects to the locally installed Go Rot companion, which relays content-free Codex and Claude lifecycle events. No data is sent to a developer-operated server.",
+    "storage": "Stores Go Rot settings, readiness evidence, window placement, and content-free local task state on the user's device.",
+    "scripting": "After the user grants access to a selected feed, pauses or resumes that page's video and can wait for the current clip to end before returning to the agent.",
+    "system.display": "Remembers the Go Rot popup's display and bounds so the same feed window returns to the user's chosen screen.",
+    "optionalHostPermissions": "Requested only for YouTube Shorts, TikTok, or Instagram Reels selected by the user. Access is used locally to control the playing video and detect clip changes; Go Rot does not read page text, cookies, history, messages, likes, or comments."
+  }
+}

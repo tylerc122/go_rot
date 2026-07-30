@@ -18,8 +18,8 @@ import {
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 test("hook events travel through the local companion to native messaging", async (t) => {
-  const runtime = fs.mkdtempSync(path.join(os.tmpdir(), "firsttok-runtime-"));
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "firsttok-home-"));
+  const runtime = fs.mkdtempSync(path.join(os.tmpdir(), "go-rot-runtime-"));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "go-rot-home-"));
   const otelConfig = createClaudeOtelConfig(await availablePort());
   fs.mkdirSync(path.dirname(claudeOtelConfigPath(home)), { recursive: true });
   fs.writeFileSync(
@@ -29,9 +29,9 @@ test("hook events travel through the local companion to native messaging", async
   );
   const environment = {
     ...process.env,
-    FIRSTTOK_HOME: home,
-    FIRSTTOK_RUNTIME_DIR: runtime,
-    FIRSTTOK_SOURCE_APP: "Terminal"
+    GO_ROT_HOME: home,
+    GO_ROT_RUNTIME_DIR: runtime,
+    GO_ROT_SOURCE_APP: "Terminal"
   };
   const host = spawn(process.execPath, [path.join(root, "companion", "native-host.mjs")], {
     cwd: root,
@@ -58,7 +58,7 @@ test("hook events travel through the local companion to native messaging", async
   const hook = spawn(
     process.execPath,
     [
-      path.join(root, "bin", "firsttok-hook.mjs"),
+      path.join(root, "bin", "go-rot-hook.mjs"),
       "--provider",
       "codex",
       "--surface",
@@ -95,7 +95,7 @@ test("hook events travel through the local companion to native messaging", async
   const resumeHook = spawn(
     process.execPath,
     [
-      path.join(root, "bin", "firsttok-hook.mjs"),
+      path.join(root, "bin", "go-rot-hook.mjs"),
       "--provider",
       "codex",
       "--surface",
@@ -131,7 +131,7 @@ test("hook events travel through the local companion to native messaging", async
   const continuationHook = spawn(
     process.execPath,
     [
-      path.join(root, "bin", "firsttok-hook.mjs"),
+      path.join(root, "bin", "go-rot-hook.mjs"),
       "--provider",
       "codex",
       "--surface",
@@ -178,7 +178,7 @@ test("hook events travel through the local companion to native messaging", async
   const permissionHook = spawn(
     process.execPath,
     [
-      path.join(root, "bin", "firsttok-hook.mjs"),
+      path.join(root, "bin", "go-rot-hook.mjs"),
       "--provider",
       "claude-code",
       "--surface",
@@ -537,11 +537,11 @@ test("hook events travel through the local companion to native messaging", async
 });
 
 test("the self-contained Codex plugin hook uses the same private transport", async (t) => {
-  const runtime = fs.mkdtempSync(path.join(os.tmpdir(), "firsttok-plugin-"));
+  const runtime = fs.mkdtempSync(path.join(os.tmpdir(), "go-rot-plugin-"));
   const environment = {
     ...process.env,
-    FIRSTTOK_RUNTIME_DIR: runtime,
-    FIRSTTOK_SOURCE_APP: "Codex"
+    GO_ROT_RUNTIME_DIR: runtime,
+    GO_ROT_SOURCE_APP: "Codex"
   };
   const host = spawn(
     process.execPath,
@@ -560,7 +560,7 @@ test("the self-contained Codex plugin hook uses the same private transport", asy
   await waitFor(() => messages.some((message) => message.type === "companion.ready"));
 
   const hook = spawn(
-    path.join(root, "integrations", "firsttok", "scripts", "run-hook"),
+    path.join(root, "integrations", "go-rot", "scripts", "run-hook"),
     [],
     {
       cwd: root,
@@ -600,12 +600,12 @@ test("the self-contained Codex plugin hook uses the same private transport", asy
 });
 
 test("hook failure stays silent, successful, and bounded without a companion", async () => {
-  const runtime = fs.mkdtempSync(path.join(os.tmpdir(), "firsttok-missing-"));
+  const runtime = fs.mkdtempSync(path.join(os.tmpdir(), "go-rot-missing-"));
   const startedAt = performance.now();
   const hook = spawn(
     process.execPath,
     [
-      path.join(root, "bin", "firsttok-hook.mjs"),
+      path.join(root, "bin", "go-rot-hook.mjs"),
       "--provider",
       "claude-code",
       "--surface",
@@ -613,7 +613,7 @@ test("hook failure stays silent, successful, and bounded without a companion", a
     ],
     {
       cwd: root,
-      env: { ...process.env, FIRSTTOK_RUNTIME_DIR: runtime },
+      env: { ...process.env, GO_ROT_RUNTIME_DIR: runtime },
       stdio: ["pipe", "pipe", "pipe"]
     }
   );
@@ -714,7 +714,7 @@ async function sendClaudeHook(environment, input) {
   const hook = spawn(
     process.execPath,
     [
-      path.join(root, "bin", "firsttok-hook.mjs"),
+      path.join(root, "bin", "go-rot-hook.mjs"),
       "--provider",
       "claude-code",
       "--surface",

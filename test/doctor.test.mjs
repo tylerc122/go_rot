@@ -10,9 +10,9 @@ import { NativeMessageDecoder } from "../companion/native-framing.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 test("doctor distinguishes installation, hook approval, and live companion state", async (t) => {
-  const target = fs.mkdtempSync(path.join(os.tmpdir(), "firsttok-doctor-"));
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), "go-rot-doctor-"));
   const runtime = fs.mkdtempSync(
-    path.join(os.tmpdir(), "firsttok-doctor-runtime-")
+    path.join(os.tmpdir(), "go-rot-doctor-runtime-")
   );
   fs.writeFileSync(
     path.join(target, "claude"),
@@ -56,8 +56,8 @@ test("doctor distinguishes installation, hook approval, and live companion state
     cwd: root,
     env: {
       ...process.env,
-      FIRSTTOK_HOME: target,
-      FIRSTTOK_RUNTIME_DIR: runtime
+      GO_ROT_HOME: target,
+      GO_ROT_RUNTIME_DIR: runtime
     },
     stdio: ["pipe", "pipe", "pipe"]
     }
@@ -86,8 +86,8 @@ function run(args, home, runtime) {
     cwd: root,
     env: {
       ...process.env,
-      FIRSTTOK_HOME: home,
-      FIRSTTOK_RUNTIME_DIR: runtime,
+      GO_ROT_HOME: home,
+      GO_ROT_RUNTIME_DIR: runtime,
       CLAUDE_CLI_PATH: path.join(home, "claude")
     },
     encoding: "utf8"

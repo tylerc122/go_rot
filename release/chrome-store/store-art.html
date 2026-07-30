@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Go Rot store artwork</title>
+    <link rel="stylesheet" href="store-art.css" />
+  </head>
+  <body>
+    <main class="art">
+      <section class="copy">
+        <img class="mark" src="../../site/assets/icon.svg" alt="" />
+        <p class="eyebrow">A short-form waiting room for coding agents</p>
+        <h1>Prompt your agent.<br /><span>Go rot.</span></h1>
+        <p class="deck">Your feed opens while Codex or Claude works, then gets out of the way when it needs you.</p>
+        <ol class="handoff">
+          <li><span>1</span> Delegate</li>
+          <li><span>2</span> Rot responsibly</li>
+          <li><span>3</span> Come back on cue</li>
+        </ol>
+      </section>
+
+      <section class="panel-shot" aria-label="Go Rot extension panel">
+        <div class="browser-bar"><i></i><i></i><i></i><span>Go Rot</span></div>
+        <iframe title="Go Rot extension panel" src="../../extension/panel.html"></iframe>
+      </section>
+
+      <section class="demo-shot" aria-label="Go Rot demo">
+        <div class="demo-frame">
+          <div class="browser-bar"><i></i><i></i><i></i><span>go rot, responsibly</span></div>
+          <img src="../../site/assets/go-rot-poster.jpg" alt="" />
+        </div>
+        <div class="demo-copy">
+          <p>Same feed.</p>
+          <p>Right back when your agent needs you.</p>
+        </div>
+      </section>
+
+      <section class="promo">
+        <img src="../../site/assets/icon.svg" alt="" />
+        <div><strong>Go Rot</strong><span>Rot responsibly.</span></div>
+      </section>
+    </main>
+    <script>
+      const asset = new URLSearchParams(location.search).get("asset") || "screenshot-panel";
+      document.body.dataset.asset = asset;
+      const frame = document.querySelector("iframe");
+      frame.addEventListener("load", () => {
+        const panel = frame.contentDocument;
+        if (!panel) return;
+        panel.querySelector("#enabled")?.setAttribute("checked", "");
+        panel.querySelector("#status-title").textContent = "Ready to rot.";
+        panel.querySelector("#status-detail").textContent = "Waiting for Codex or Claude.";
+        panel.querySelector(".status")?.setAttribute("data-tone", "ready");
+        panel.querySelector("#setup")?.removeAttribute("open");
+        panel.querySelector('[data-provider="youtube"]')?.setAttribute("aria-pressed", "true");
+        panel.querySelector("#agent-claude")?.setAttribute("checked", "");
+        panel.querySelector("#agent-codex")?.setAttribute("checked", "");
+      });
+    </script>
+  </body>
+</html>

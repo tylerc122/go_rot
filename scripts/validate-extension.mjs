@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const extensionRoot = path.join(root, "extension");
 const manifest = readJson(path.join(extensionRoot, "manifest.json"));
+const contract = readJson(path.join(root, "release", "release-contract.json"));
 const errors = [];
 
 expect(manifest.manifest_version === 3, "manifest_version must be 3");
@@ -20,8 +21,8 @@ expect(
   manifest.permissions?.includes("system.display"),
   "system.display permission is missing"
 );
-expect(!manifest.host_permissions, "host_permissions are not allowed in the MVP");
-expect(!manifest.content_scripts, "content scripts are not allowed in the MVP");
+expect(!manifest.host_permissions, "host_permissions are not allowed");
+expect(!manifest.content_scripts, "content scripts are not allowed");
 expect(
   JSON.stringify(manifest.optional_host_permissions) ===
     JSON.stringify([
@@ -48,7 +49,14 @@ for (const [size, relativePath] of Object.entries(manifest.icons ?? {})) {
 }
 
 const extensionId = idFromKey(manifest.key);
-expect(extensionId === "kdioecoelofnlhihkiadpmknlfdmmopn", "extension key changed its stable ID");
+expect(
+  extensionId === contract.identifiers.chromeExtensionDevelopment,
+  "extension key changed its stable development ID"
+);
+expect(
+  /^[a-p]{32}$/.test(contract.identifiers.chromeExtension),
+  "production Chrome Web Store ID must contain 32 letters from a-p"
+);
 
 if (errors.length > 0) {
   console.error("Extension validation failed:");
@@ -56,7 +64,9 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log(`Extension validation passed: ${extensionId}`);
+console.log(
+  `Extension validation passed: development ${extensionId}; production ${contract.identifiers.chromeExtension}`
+);
 
 function referencedFiles(value, key = "") {
   if (typeof value === "string") {

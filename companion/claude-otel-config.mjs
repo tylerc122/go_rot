@@ -19,14 +19,14 @@ export const CLAUDE_OTEL_ENVIRONMENT_KEYS = Object.freeze([
   "OTEL_LOG_RAW_API_BODIES"
 ]);
 
-export function firstTokSupportDirectory(home = firstTokHome()) {
-  return path.join(home, "Library", "Application Support", "FirstTok");
+export function goRotSupportDirectory(home = goRotHome()) {
+  return path.join(home, "Library", "Application Support", "Go Rot");
 }
 
-export function claudeOtelConfigPath(home = firstTokHome()) {
-  return process.env.FIRSTTOK_OTEL_CONFIG_PATH
-    ? path.resolve(process.env.FIRSTTOK_OTEL_CONFIG_PATH)
-    : path.join(firstTokSupportDirectory(home), "claude-otel.json");
+export function claudeOtelConfigPath(home = goRotHome()) {
+  return process.env.GO_ROT_OTEL_CONFIG_PATH
+    ? path.resolve(process.env.GO_ROT_OTEL_CONFIG_PATH)
+    : path.join(goRotSupportDirectory(home), "claude-otel.json");
 }
 
 export function createClaudeOtelConfig(port) {
@@ -38,7 +38,7 @@ export function createClaudeOtelConfig(port) {
   });
 }
 
-export function readClaudeOtelConfig(home = firstTokHome()) {
+export function readClaudeOtelConfig(home = goRotHome()) {
   try {
     return normalizeClaudeOtelConfig(
       JSON.parse(fs.readFileSync(claudeOtelConfigPath(home), "utf8"))
@@ -90,8 +90,8 @@ export function claudeOtelEnvironment(config) {
   };
 }
 
-function firstTokHome() {
-  return process.env.FIRSTTOK_HOME
-    ? path.resolve(process.env.FIRSTTOK_HOME)
+function goRotHome() {
+  return process.env.GO_ROT_HOME
+    ? path.resolve(process.env.GO_ROT_HOME)
     : os.homedir();
 }

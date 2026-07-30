@@ -240,7 +240,7 @@ async function handleRequest(request, response, options) {
     response.setHeader("Content-Type", "application/json");
     response.writeHead(200).end("{}\n");
   } catch (error) {
-    if (error?.code === "FIRSTTOK_TOO_LARGE") {
+    if (error?.code === "GO_ROT_TOO_LARGE") {
       response.writeHead(413).end();
     } else {
       response.writeHead(400).end();
@@ -266,7 +266,7 @@ function readBody(request, maximumBytes) {
       if (size > maximumBytes && !tooLarge) {
         tooLarge = true;
         const error = new Error("OTLP request is too large.");
-        error.code = "FIRSTTOK_TOO_LARGE";
+        error.code = "GO_ROT_TOO_LARGE";
         reject(error);
         return;
       }

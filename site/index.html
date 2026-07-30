@@ -45,15 +45,21 @@
           </p>
 
           <div class="actions" aria-label="Go Rot downloads">
-            <button class="download-button" type="button" disabled>
-              <svg viewBox="0 0 20 20" aria-hidden="true">
-                <path
-                  d="M15.5 10.7c0-2.7 2.2-4 2.3-4.1a5 5 0 0 0-3.9-2.1c-1.6-.2-3.2 1-4 1-1 0-2.4-1-3.8-1-2 0-3.7 1.1-4.7 2.8-2 3.4-.5 8.4 1.4 11.2.9 1.4 2 2.9 3.5 2.8 1.4-.1 2-1 3.7-1s2.2 1 3.7 1c1.5 0 2.5-1.4 3.4-2.8a12 12 0 0 0 1.6-3.3 4.7 4.7 0 0 1-3.2-4.5ZM12.8 2.8A4.7 4.7 0 0 0 13.9-.6a4.8 4.8 0 0 0-3.1 1.6 4.5 4.5 0 0 0-1.1 3.3 4 4 0 0 0 3.1-1.5Z"
-                />
-              </svg>
-              <span>Download for Mac</span>
-              <small>soon</small>
-            </button>
+            <div class="action-buttons">
+              <a class="download-button" data-release-link="mac" aria-disabled="true">
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <path
+                    d="M15.5 10.7c0-2.7 2.2-4 2.3-4.1a5 5 0 0 0-3.9-2.1c-1.6-.2-3.2 1-4 1-1 0-2.4-1-3.8-1-2 0-3.7 1.1-4.7 2.8-2 3.4-.5 8.4 1.4 11.2.9 1.4 2 2.9 3.5 2.8 1.4-.1 2-1 3.7-1s2.2 1 3.7 1c1.5 0 2.5-1.4 3.4-2.8a12 12 0 0 0 1.6-3.3 4.7 4.7 0 0 1-3.2-4.5ZM12.8 2.8A4.7 4.7 0 0 0 13.9-.6a4.8 4.8 0 0 0-3.1 1.6 4.5 4.5 0 0 0-1.1 3.3 4 4 0 0 0 3.1-1.5Z"
+                  />
+                </svg>
+                <span>Download for Mac</span>
+                <small data-release-badge>soon</small>
+              </a>
+              <a class="chrome-button" data-release-link="chrome" aria-disabled="true">
+                <span>Add to Chrome</span>
+                <small data-release-badge>soon</small>
+              </a>
+            </div>
             <p>macOS · Chrome · Codex or Claude</p>
           </div>
         </section>
@@ -112,6 +118,10 @@
           <li><span>3</span> Prompt, then disappear</li>
         </ol>
         <p class="privacy">Local only. No account. Does not read your chats.</p>
+        <nav class="legal-links" aria-label="Legal and support">
+          <a href="privacy.html">Privacy</a>
+          <a href="support.html">Support</a>
+        </nav>
       </footer>
     </div>
     <script src="site.js" defer></script>

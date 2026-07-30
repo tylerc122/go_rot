@@ -17,11 +17,11 @@ const output = path.resolve(
   outputPath ??
     path.join(
       os.tmpdir(),
-      `firsttok-claude-events-${new Date().toISOString().replaceAll(":", "-")}.jsonl`
+      `go-rot-claude-events-${new Date().toISOString().replaceAll(":", "-")}.jsonl`
     )
 );
 const temporaryDirectory = fs.mkdtempSync(
-  path.join(os.tmpdir(), "firsttok-claude-capture-")
+  path.join(os.tmpdir(), "go-rot-claude-capture-")
 );
 const settingsPath = path.join(temporaryDirectory, "settings.json");
 const environment = claudeOtelEnvironment(config);

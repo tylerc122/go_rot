@@ -17,6 +17,10 @@ import {
 import { readClaudeOtelConfig } from "./claude-otel-config.mjs";
 import { startClaudeOtelReceiver } from "./claude-otel-receiver.mjs";
 import { activateChromeFeed } from "./macos-activation.mjs";
+import {
+  isSourceApplicationFrontmost,
+  sendGoRotNotification
+} from "./macos-notification.mjs";
 import { NativeMessageDecoder, encodeNativeMessage } from "./native-framing.mjs";
 import { normalizeLifecycleEvent } from "./protocol.mjs";
 
@@ -429,15 +433,9 @@ async function focusApplication(applicationName) {
 }
 
 async function notifyFocusFailure() {
-  if (process.platform !== "darwin") return;
   try {
-    await execFileAsync(
-      "/usr/bin/osascript",
-      [
-        "-e",
-        'display notification "The feed closed, but the source app could not be restored." with title "Go Rot"'
-      ],
-      { timeout: 2_000 }
+    await sendGoRotNotification(
+      "The feed closed, but the source app could not be restored."
     );
   } catch {
     // The feed is already closed; notification failure is non-fatal.
@@ -445,17 +443,10 @@ async function notifyFocusFailure() {
 }
 
 async function notifyReady(session) {
-  if (process.platform !== "darwin") return;
+  if (await isSourceApplicationFrontmost(session?.sourceApp)) return;
   const agent = session?.agent === "claude-code" ? "Claude Code" : "Codex";
   try {
-    await execFileAsync(
-      "/usr/bin/osascript",
-      [
-        "-e",
-        `display notification "${agent} cooked." with title "Go Rot"`
-      ],
-      { timeout: 2_000 }
-    );
+    await sendGoRotNotification(`${agent} cooked.`);
   } catch {
     // Notification failure must never affect the agent lifecycle.
   }

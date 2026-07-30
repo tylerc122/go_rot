@@ -15,9 +15,12 @@ import {
 } from "../companion/claude-otel-config.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const productionAppBundle = process.env.GO_ROT_APP_BUNDLE
+  ? path.resolve(process.env.GO_ROT_APP_BUNDLE)
+  : null;
 const surface = parseSurface(process.argv.slice(2));
-const home = process.env.FIRSTTOK_HOME
-  ? path.resolve(process.env.FIRSTTOK_HOME)
+const home = process.env.GO_ROT_HOME
+  ? path.resolve(process.env.GO_ROT_HOME)
   : os.homedir();
 const checks = [];
 const nativeManifest = readJson(nativeManifestPath());
@@ -31,7 +34,7 @@ if (surface !== "claude") {
   check(
     "Codex plugin bundle",
     fs.existsSync(
-      path.join(root, "integrations", "firsttok", "hooks", "hooks.json")
+      path.join(root, "integrations", "go-rot", "hooks", "hooks.json")
     )
   );
 }
@@ -119,11 +122,11 @@ function hookConfigIsValid(filePath) {
   try {
     const config = fs.readFileSync(filePath, "utf8");
     return (
-      config.includes("FIRSTTOK_HOOK") &&
+      config.includes("GO_ROT_HOOK") &&
       config.includes(process.execPath) &&
       config.includes("PostToolUse") &&
       !config.includes("claude-permission-hook.mjs") &&
-      !config.includes("FIRSTTOK_HOOK=1 /usr/bin/env node")
+      !config.includes("GO_ROT_HOOK=1 /usr/bin/env node")
     );
   } catch {
     return false;
@@ -225,13 +228,19 @@ function nativeLauncherIsValid(launcherPath) {
   if (!launcherPath || !path.isAbsolute(launcherPath)) return false;
   try {
     fs.accessSync(launcherPath, fs.constants.X_OK);
-    const launcher = fs.readFileSync(launcherPath, "utf8");
-    const shapeIsValid =
+    const productionLauncher = launcherPath.endsWith(
+      path.join("Contents", "MacOS", "go-rot-native-host")
+    );
+    const launcher = productionLauncher
+      ? ""
+      : fs.readFileSync(launcherPath, "utf8");
+    const shapeIsValid = productionLauncher || (
       launcher.includes(path.join(root, "companion", "native-host.mjs")) &&
-      !launcher.includes("/usr/bin/env node");
+      !launcher.includes("/usr/bin/env node")
+    );
     if (!shapeIsValid) return false;
 
-    const probe = spawnSync(launcherPath, ["--firsttok-launch-check"], {
+    const probe = spawnSync(launcherPath, ["--go-rot-launch-check"], {
       env: {
         ...process.env,
         PATH: "/usr/bin:/bin:/usr/sbin:/sbin"
@@ -304,6 +313,14 @@ function nativeManifestPath() {
 }
 
 function extensionId() {
+  if (productionAppBundle) {
+    return JSON.parse(
+      fs.readFileSync(
+        path.join(root, "release", "release-contract.json"),
+        "utf8"
+      )
+    ).identifiers.chromeExtension;
+  }
   const manifest = JSON.parse(
     fs.readFileSync(path.join(root, "extension", "manifest.json"), "utf8")
   );

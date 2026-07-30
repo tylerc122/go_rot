@@ -258,7 +258,9 @@ test("terminal session event after an app switch notifies without stealing focus
   assert.ok(
     postedToNative.some(
       (message) =>
-        message.type === "source.notify" && message.sessionId === "s3"
+        message.type === "source.notify" &&
+        message.sessionId === "s3" &&
+        message.sourceApp === "Codex"
     )
   );
 });

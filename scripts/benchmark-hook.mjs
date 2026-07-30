@@ -9,11 +9,11 @@ import { fileURLToPath } from "node:url";
 import { NativeMessageDecoder } from "../companion/native-framing.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const runtime = fs.mkdtempSync(path.join(os.tmpdir(), "firsttok-bench-"));
+const runtime = fs.mkdtempSync(path.join(os.tmpdir(), "go-rot-bench-"));
 const environment = {
   ...process.env,
-  FIRSTTOK_RUNTIME_DIR: runtime,
-  FIRSTTOK_SOURCE_APP: "Terminal"
+  GO_ROT_RUNTIME_DIR: runtime,
+  GO_ROT_SOURCE_APP: "Terminal"
 };
 const host = spawn(
   process.execPath,
@@ -44,7 +44,7 @@ try {
   console.log(`Hook latency median: ${median.toFixed(1)} ms`);
   console.log(`Hook latency p95: ${p95.toFixed(1)} ms`);
   if (p95 > 100) {
-    console.error("Hook latency exceeds the 100 ms MVP target.");
+    console.error("Hook latency exceeds the 100 ms target.");
     process.exitCode = 1;
   }
 } finally {
@@ -56,7 +56,7 @@ function runHook(index) {
     const hook = spawn(
       process.execPath,
       [
-        path.join(root, "bin", "firsttok-hook.mjs"),
+        path.join(root, "bin", "go-rot-hook.mjs"),
         "--provider",
         "codex",
         "--surface",
