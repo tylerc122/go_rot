@@ -1,4 +1,4 @@
-# Chrome Web Store Submission: Go Rot 0.1.0
+# Chrome Web Store Submission: Go Rot 0.1.1
 
 ## Store listing
 
@@ -66,7 +66,7 @@ asks for them.
 ## Submission sequence
 
 1. Register and verify the Chrome Web Store publisher account.
-2. Upload `dist/go-rot-chrome-v0.1.0.zip` as a new item.
+2. Upload `dist/go-rot-chrome-v0.1.1.zip` to the existing item.
 3. Copy the assigned item ID into
    `release/release-contract.json` as `identifiers.chromeExtension`. The local
    development ID remains separate.

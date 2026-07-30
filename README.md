@@ -11,13 +11,15 @@ your prompts, answers, source code, cookies, or feed content.
 
 ## Install
 
-1. Download Go Rot for Mac from [gorot.dev](https://gorot.dev).
+Get Go Rot from [gorot.dev](https://gorot.dev):
+
+1. Install the Mac app.
 2. Open **Go Rot** and choose **Install or repair setup**.
-3. Add the Chrome extension and pin it to the toolbar.
-4. Approve the Go Rot hooks when Codex or Claude asks.
+3. Add the Chrome extension.
 
 Go Rot supports macOS 13 or newer, Google Chrome, Codex, and Claude Code.
-The Mac installer includes its own runtime.
+The Mac app includes everything it needs. If something does not connect, see
+[setup and support](https://gorot.dev/support.html).
 
 ## Develop locally
 
@@ -36,11 +38,6 @@ Remove the local setup with:
 ```sh
 npm run remove
 ```
-
-## A small known edge
-
-Codex Desktop's Stop button does not always emit a lifecycle event. If Go Rot
-still shows a stopped task, use **Clear stuck** in the Chrome panel.
 
 ## Privacy
 

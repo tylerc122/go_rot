@@ -1,11 +1,11 @@
-# Go Rot 0.1.0
+# Go Rot 0.1.1
 
 Go Rot opens your short-form feed while Codex or Claude works, returns you when
 the agent needs attention, and closes the feed when every tracked task is done.
 
 ## Install
 
-1. Download `go-rot-macos-v0.1.0.pkg` and run it.
+1. Download `go-rot-macos-v0.1.1.pkg` and run it.
 2. Open **Go Rot** from Applications.
 3. Choose **Install or repair setup**, then **Check readiness**.
 4. Add Go Rot from the Chrome Web Store and pin it to the toolbar.
