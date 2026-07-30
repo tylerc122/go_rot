@@ -1,6 +1,6 @@
 {
   "version": "0.1.1",
-  "macDownloadUrl": null,
-  "macSha256": null,
+  "macDownloadUrl": "https://github.com/tylerc122/go_rot/releases/download/v0.1.1/go-rot-macos-v0.1.1.pkg",
+  "macSha256": "3cb540db7576fa6d14aa86d498a4aed0b8cae15a4db328325e0b374627f2c4bf",
   "chromeStoreUrl": null
 }
