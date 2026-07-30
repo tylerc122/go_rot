@@ -134,16 +134,18 @@ button:focus-visible {
 }
 
 h1 {
-  max-width: 9ch;
+  max-width: 10ch;
   margin: 0;
-  font-size: clamp(4rem, 6.9vw, 8.3rem);
-  font-weight: 860;
-  letter-spacing: -0.068em;
-  line-height: 0.82;
-  word-spacing: 0.07em;
+  font-size: clamp(3.8rem, 6.2vw, 7.5rem);
+  font-weight: 830;
+  letter-spacing: -0.038em;
+  line-height: 0.9;
+  word-spacing: 0.035em;
 }
 
 h1 span {
+  display: inline-block;
+  margin-top: 0.08em;
   color: var(--lilac-strong);
 }
 
@@ -463,7 +465,7 @@ h1 span {
   }
 
   h1 {
-    font-size: clamp(3.6rem, 6.4vw, 5.7rem);
+    font-size: clamp(3.5rem, 5.8vw, 5.35rem);
   }
 
   .install-strip {
@@ -497,9 +499,9 @@ h1 span {
   }
 
   h1 {
-    max-width: 9.5ch;
-    font-size: clamp(3.5rem, 5.75vw, 5.1rem);
-    line-height: 0.79;
+    max-width: 10ch;
+    font-size: clamp(3.4rem, 5.35vw, 4.8rem);
+    line-height: 0.9;
   }
 
   .intro {
@@ -541,8 +543,8 @@ h1 span {
   }
 
   h1 {
-    max-width: 8.5ch;
-    font-size: clamp(4rem, 13vw, 7.2rem);
+    max-width: 9.5ch;
+    font-size: clamp(3.8rem, 12vw, 6.6rem);
   }
 
   .intro {
@@ -592,7 +594,7 @@ h1 span {
   }
 
   h1 {
-    font-size: clamp(3.55rem, 17vw, 5.5rem);
+    font-size: clamp(3.3rem, 15vw, 5rem);
   }
 
   .actions {

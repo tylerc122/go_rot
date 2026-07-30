@@ -21,11 +21,11 @@ body { margin: 0; overflow: hidden; background: var(--canvas); color: var(--grap
   width: 625px;
 }
 
-.mark { width: 58px; height: 58px; margin-bottom: 34px; }
+.mark { width: 58px; height: 58px; margin-bottom: 36px; }
 .eyebrow { margin: 0 0 22px; color: var(--lilac); font-size: 15px; font-weight: 790; letter-spacing: 0.075em; text-transform: uppercase; }
-h1 { margin: 0; font-size: 76px; font-weight: 880; letter-spacing: -0.075em; line-height: 0.88; }
-h1 span { color: var(--lilac); }
-.deck { max-width: 545px; margin: 34px 0 0; color: var(--muted); font-size: 23px; font-weight: 540; line-height: 1.42; }
+h1 { margin: 0; font-size: 70px; font-weight: 840; letter-spacing: -0.038em; line-height: 0.94; word-spacing: 0.035em; }
+h1 span { display: inline-block; margin-top: 7px; color: var(--lilac); }
+.deck { max-width: 545px; margin: 38px 0 0; color: var(--muted); font-size: 22px; font-weight: 540; line-height: 1.48; }
 .handoff { display: flex; gap: 26px; margin: 48px 0 0; padding: 0; list-style: none; font-size: 14px; font-weight: 710; }
 .handoff li { display: flex; align-items: center; gap: 9px; }
 .handoff span { display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid var(--lilac); border-radius: 50%; color: var(--lilac); font-size: 11px; }
@@ -54,10 +54,10 @@ body[data-asset="screenshot-demo"] .panel-shot { display: none; }
 body[data-asset="screenshot-demo"] .demo-shot { display: block; width: 100%; height: 100%; padding: 36px 70px 0; }
 .demo-copy { display: flex; width: 1140px; align-items: flex-end; justify-content: space-between; }
 .demo-eyebrow { margin: 0 0 7px; color: var(--lilac); font-size: 14px; font-weight: 790; letter-spacing: 0.075em; text-transform: uppercase; }
-.demo-copy h2 { margin: 0; font-size: 42px; font-weight: 860; letter-spacing: -0.055em; line-height: 1; }
+.demo-copy h2 { margin: 0; font-size: 42px; font-weight: 830; letter-spacing: -0.028em; line-height: 1.05; }
 .demo-return { width: 310px; margin: 0 0 3px; color: var(--lilac); font-size: 22px; font-weight: 720; line-height: 1.15; }
 .demo-frame { width: 1140px; margin-top: 24px; overflow: hidden; border: 2px solid var(--graphite); border-radius: 13px; background: var(--graphite); box-shadow: 13px 13px 0 var(--graphite); }
-.demo-frame img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+.demo-frame img { display: block; width: 100%; height: auto; }
 
 body[data-asset="promo-small"] .copy,
 body[data-asset="promo-small"] .panel-shot,
