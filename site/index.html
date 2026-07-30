@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Prompt your agent. Go rot."
+    />
+    <meta name="theme-color" content="#e9e1f3" />
+    <title>Go Rot</title>
+    <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="site-header">
+        <a class="brand" href="./" aria-label="Go Rot home">
+          <img src="assets/icon.svg" alt="" width="38" height="38" />
+          <span>Go Rot</span>
+        </a>
+
+        <a
+          class="github-link"
+          href="https://github.com/tylerc122/go_rot"
+          rel="noreferrer"
+        >
+          GitHub
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M4 12 12 4M6 4h6v6" />
+          </svg>
+        </a>
+      </header>
+
+      <main class="hero">
+        <section class="hero-copy" aria-labelledby="hero-title">
+          <p class="eyebrow">A short-form waiting room for coding agents</p>
+          <h1 id="hero-title">
+            Prompt your agent.<br />
+            <span>Go rot.</span>
+          </h1>
+          <p class="intro">
+            Your feed opens while Codex or Claude works, gets out of the way
+            when it needs you, and disappears when the job is done.
+          </p>
+
+          <div class="actions" aria-label="Go Rot downloads">
+            <button class="download-button" type="button" disabled>
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path
+                  d="M15.5 10.7c0-2.7 2.2-4 2.3-4.1a5 5 0 0 0-3.9-2.1c-1.6-.2-3.2 1-4 1-1 0-2.4-1-3.8-1-2 0-3.7 1.1-4.7 2.8-2 3.4-.5 8.4 1.4 11.2.9 1.4 2 2.9 3.5 2.8 1.4-.1 2-1 3.7-1s2.2 1 3.7 1c1.5 0 2.5-1.4 3.4-2.8a12 12 0 0 0 1.6-3.3 4.7 4.7 0 0 1-3.2-4.5ZM12.8 2.8A4.7 4.7 0 0 0 13.9-.6a4.8 4.8 0 0 0-3.1 1.6 4.5 4.5 0 0 0-1.1 3.3 4 4 0 0 0 3.1-1.5Z"
+                />
+              </svg>
+              <span>Download for Mac</span>
+              <small>soon</small>
+            </button>
+            <p>macOS · Chrome · Codex or Claude</p>
+          </div>
+        </section>
+
+        <section class="demo" aria-label="Go Rot demo">
+          <div class="demo-window">
+            <div class="window-bar" aria-hidden="true">
+              <div class="window-dots">
+                <span></span><span></span><span></span>
+              </div>
+              <div class="window-label">go rot, responsibly</div>
+              <div class="window-mark">GR</div>
+            </div>
+
+            <div class="demo-player">
+              <video
+                id="demo-video"
+                class="demo-video"
+                autoplay
+                muted
+                loop
+                playsinline
+                preload="metadata"
+                poster="assets/go-rot-poster.jpg"
+                aria-label="Go Rot opens a short-form feed while a coding agent works, then returns when the agent is ready."
+              >
+                <source src="assets/go-rot-demo.mp4" type="video/mp4" />
+              </video>
+              <button
+                class="video-toggle"
+                type="button"
+                data-state="playing"
+                aria-controls="demo-video"
+                aria-label="Pause demo"
+              >
+                <svg class="pause-icon" viewBox="0 0 20 20" aria-hidden="true">
+                  <path d="M6 4.5h2.5v11H6zM11.5 4.5H14v11h-2.5z" />
+                </svg>
+                <svg class="play-icon" viewBox="0 0 20 20" aria-hidden="true">
+                  <path d="m7 4.5 8 5.5-8 5.5z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <p class="demo-caption">
+            One silent loop. No founder voiceover. No cinematic keyboard shot.
+          </p>
+        </section>
+      </main>
+
+      <footer class="install-strip">
+        <p class="strip-label">The whole ordeal</p>
+        <ol>
+          <li><span>1</span> Download Go Rot</li>
+          <li><span>2</span> Add to Chrome</li>
+          <li><span>3</span> Prompt, then disappear</li>
+        </ol>
+        <p class="privacy">Local only. No account. Does not read your chats.</p>
+      </footer>
+    </div>
+    <script src="site.js" defer></script>
+  </body>
+</html>
