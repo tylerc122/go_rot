@@ -222,6 +222,30 @@ h1 span {
   gap: 12px;
 }
 
+.release-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--lilac-strong);
+  font-size: 0.72rem;
+  font-weight: 820;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.release-status[hidden] {
+  display: none;
+}
+
+.release-status span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: status-pulse 1.8s ease-in-out infinite;
+}
+
 .download-button,
 .chrome-button {
   position: relative;
@@ -297,27 +321,6 @@ h1 span {
 
 .download-button:not([aria-disabled="true"]):hover svg {
   transform: translateY(2px);
-}
-
-.download-button small,
-.chrome-button small {
-  padding: 5px 7px;
-  border-radius: 6px;
-  background: var(--lilac-bright);
-  color: var(--graphite);
-  font-size: 0.62rem;
-  font-weight: 820;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  transition:
-    background 180ms var(--ease-out),
-    transform 180ms var(--ease-out);
-}
-
-.download-button:not([aria-disabled="true"]):hover small,
-.chrome-button:not([aria-disabled="true"]):hover small {
-  background: var(--lilac-bright);
-  transform: translateX(2px) rotate(-2deg);
 }
 
 .demo {
@@ -565,6 +568,18 @@ h1 span {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes status-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 

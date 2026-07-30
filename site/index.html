@@ -10,7 +10,7 @@
     <meta name="theme-color" content="#e9e1f3" />
     <title>Go Rot</title>
     <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=20260730b" />
   </head>
   <body>
     <div class="page-shell">
@@ -46,6 +46,10 @@
           </p>
 
           <div class="actions" aria-label="Go Rot downloads">
+            <p class="release-status" data-release-status>
+              <span aria-hidden="true"></span>
+              Coming soon
+            </p>
             <div class="action-buttons">
               <a class="download-button" data-release-link="mac" aria-disabled="true">
                 <svg viewBox="0 0 20 20" aria-hidden="true">
@@ -54,11 +58,9 @@
                   />
                 </svg>
                 <span>Download for Mac</span>
-                <small data-release-badge>soon</small>
               </a>
               <a class="chrome-button" data-release-link="chrome" aria-disabled="true">
                 <span>Add to Chrome</span>
-                <small data-release-badge>soon</small>
               </a>
             </div>
           </div>
@@ -83,10 +85,10 @@
                 loop
                 playsinline
                 preload="metadata"
-                poster="assets/go-rot-poster.jpg"
+                poster="assets/go-rot-poster.jpg?v=20260730b"
                 aria-label="Go Rot opens a short-form feed while a coding agent works, then returns when the agent is ready."
               >
-                <source src="assets/go-rot-demo.mp4" type="video/mp4" />
+                <source src="assets/go-rot-demo.mp4?v=20260730b" type="video/mp4" />
               </video>
               <button
                 class="video-toggle"
@@ -126,6 +128,6 @@
         </div>
       </footer>
     </div>
-    <script src="site.js" defer></script>
+    <script src="site.js?v=20260730b" defer></script>
   </body>
 </html>
