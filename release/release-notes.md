@@ -15,6 +15,9 @@ the agent needs attention, and closes the feed when every tracked task is done.
    both pieces are connected.
 6. Approve the Go Rot hooks if Codex or Claude asks the first time you use it.
 
+To change the selected agents later, reopen Go Rot and choose **Change
+agents…**, or use **Go Rot → Change Agents…** from the app menu.
+
 The macOS package contains universal Apple silicon and Intel executables and a
 pinned runtime. No separate Node.js installation or Go Rot account is required.
 

@@ -35,9 +35,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var heroImage: NSImageView!
   private var agentPicker: AgentSelectionView!
   private var primaryButton: BrandButton!
+  private var secondaryButton: ActionLinkButton!
   private var progressView: SetupProgressView!
   private var readinessTimer: Timer?
   private var primaryAction: (() -> Void)?
+  private var secondaryAction: (() -> Void)?
   private var lastProgressStage = SetupStage.welcome
   private var currentStage = SetupStage.welcome
   private var isPreview = false
@@ -133,7 +135,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     primaryButton = BrandButton(title: "", target: self, action: #selector(primaryPressed))
     primaryButton.translatesAutoresizingMaskIntoConstraints = false
 
-    let copyStack = NSStackView(views: [eyebrowLabel, headlineLabel, bodyLabel, stateLabel, primaryButton])
+    secondaryButton = ActionLinkButton(
+      title: "",
+      target: self,
+      action: #selector(secondaryPressed)
+    )
+    secondaryButton.translatesAutoresizingMaskIntoConstraints = false
+    secondaryButton.isHidden = true
+
+    let copyStack = NSStackView(
+      views: [
+        eyebrowLabel,
+        headlineLabel,
+        bodyLabel,
+        stateLabel,
+        primaryButton,
+        secondaryButton
+      ]
+    )
     copyStack.orientation = .vertical
     copyStack.alignment = .leading
     copyStack.spacing = 0
@@ -141,6 +160,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     copyStack.setCustomSpacing(26, after: headlineLabel)
     copyStack.setCustomSpacing(19, after: bodyLabel)
     copyStack.setCustomSpacing(27, after: stateLabel)
+    copyStack.setCustomSpacing(9, after: primaryButton)
     copyStack.translatesAutoresizingMaskIntoConstraints = false
 
     heroImage = NSImageView(image: spiralImage())
@@ -221,6 +241,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
       primaryButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 190),
       primaryButton.heightAnchor.constraint(equalToConstant: 54),
+      secondaryButton.heightAnchor.constraint(equalToConstant: 36),
 
       footerRow.leadingAnchor.constraint(equalTo: canvas.leadingAnchor, constant: 42),
       footerRow.trailingAnchor.constraint(lessThanOrEqualTo: canvas.trailingAnchor, constant: -42),
@@ -243,8 +264,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
     appMenu.addItem(.separator())
     appMenu.addItem(
-      withTitle: "Repair Setup…",
-      action: #selector(repairSetupPressed),
+      withTitle: "Change Agents…",
+      action: #selector(changeAgentsPressed),
       keyEquivalent: ""
     ).target = self
     appMenu.addItem(
@@ -287,6 +308,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private func showAgentChoice(reset: Bool) {
+    readinessTimer?.invalidate()
     if reset { agentPicker.setSelection(codex: false, claude: false) }
     render(
       stage: .agents,
@@ -322,29 +344,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       stage: .chrome,
       eyebrow: "ONE QUICK STEP",
       headline: "Finish in Chrome.",
-      body: "Chrome is open to Go Rot. Choose Add to Chrome there—we’ll notice as soon as it connects.",
+      body: "Chrome is open to Go Rot. Choose Add to Chrome there. We’ll notice as soon as it connects.",
       state: "Waiting for the Chrome extension…",
       button: "Open in Chrome",
       buttonEnabled: true,
       footer: "The extension uses your ordinary signed-in Chrome profile",
       action: { [weak self] in self?.openChromeStore() }
     )
+    showChangeAgentsAction()
     startReadinessPolling()
   }
 
   private func showReady(requestNotifications: Bool = true) {
     readinessTimer?.invalidate()
+    let activeAgents = activeAgentNames()
+    let promptTarget =
+      activeAgents.count == 2
+        ? "Codex or Claude"
+        : activeAgents[0]
+    let trustNote = activeAgents.contains("Codex")
+      ? " Codex may ask you to trust Go Rot once."
+      : ""
+    let connectedItems = activeAgents + ["the Mac companion", "Chrome"]
     render(
       stage: .ready,
       eyebrow: "YOU’RE ALL SET",
       headline: "Ready to rot.",
-      body: "Prompt Codex or Claude. Your feed will open while it works and disappear when it needs you. Codex may ask you to trust Go Rot once.",
-      state: "Mac companion and Chrome extension connected.",
+      body: "Prompt \(promptTarget). Your feed will open while it works and disappear when it needs you.\(trustNote)",
+      state: "\(naturalList(connectedItems)) connected.",
       button: "Done",
       buttonEnabled: true,
       footer: "Local only  ·  No account  ·  Nothing leaves your Mac",
       action: { NSApp.terminate(nil) }
     )
+    showChangeAgentsAction()
     if requestNotifications && !isPreview {
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
         UNUserNotificationCenter.current().requestAuthorization(
@@ -383,6 +416,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     if stage != .failure { lastProgressStage = stage }
     currentStage = stage
     primaryAction = action
+    secondaryAction = nil
     progressView.stage = stage == .failure ? lastProgressStage : stage
     eyebrowLabel.stringValue = eyebrow
     headlineLabel.stringValue = headline
@@ -393,6 +427,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     primaryButton.setTitle(button)
     primaryButton.isEnabled = buttonEnabled
     primaryButton.isHidden = button.isEmpty
+    secondaryButton.isHidden = true
     footerLabel.stringValue = footer
     heroImage.image = stage == .failure ? failureImage() : spiralImage()
     heroImage.contentTintColor = stage == .failure ? Brand.danger : nil
@@ -411,6 +446,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       return
     }
     primaryAction?()
+  }
+
+  @objc private func secondaryPressed() {
+    secondaryAction?()
+  }
+
+  private func showChangeAgentsAction() {
+    secondaryAction = { [weak self] in self?.presentAgentChoice() }
+    secondaryButton.setTitle("Change agents…")
+    secondaryButton.isHidden = false
   }
 
   @objc private func agentSelectionChanged() {
@@ -451,15 +496,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
   }
 
-  @objc private func repairSetupPressed() {
+  @objc private func changeAgentsPressed() {
     window.makeKeyAndOrderFront(nil)
     NSApp.activate(ignoringOtherApps: true)
-    let installed = goRotInstalledAgentTargets()
+    presentAgentChoice()
+  }
+
+  private func presentAgentChoice() {
+    let installed = isPreview
+      ? Set(agentPicker.selectedTargets)
+      : goRotInstalledAgentTargets()
+    let selection = installed.isEmpty ? Set(["codex", "claude"]) : installed
     agentPicker.setSelection(
-      codex: installed.contains("codex"),
-      claude: installed.contains("claude")
+      codex: selection.contains("codex"),
+      claude: selection.contains("claude")
     )
     showAgentChoice(reset: false)
+  }
+
+  private func activeAgentNames() -> [String] {
+    let installed = goRotInstalledAgentTargets()
+    let selected = installed.isEmpty ? Set(["codex", "claude"]) : installed
+    return [
+      selected.contains("codex") ? "Codex" : nil,
+      selected.contains("claude") ? "Claude" : nil
+    ].compactMap { $0 }
+  }
+
+  private func naturalList(_ items: [String]) -> String {
+    if items.count == 1 { return items[0] }
+    if items.count == 2 { return items.joined(separator: " and ") }
+    return items.dropLast().joined(separator: ", ") + ", and " + items.last!
   }
 
   @objc private func removeSetupPressed() {
@@ -793,6 +860,90 @@ private final class AgentSelectionView: NSView {
     button.contentTintColor = Brand.lilac
     button.setAccessibilityHelp(help)
     button.focusRingType = .default
+  }
+}
+
+private final class ActionLinkButton: NSButton {
+  private var trackingArea: NSTrackingArea?
+  private var pointerInside = false
+  private var displayTitle = ""
+
+  init(title: String, target: AnyObject?, action: Selector?) {
+    super.init(frame: .zero)
+    self.target = target
+    self.action = action
+    isBordered = false
+    alignment = .left
+    focusRingType = .exterior
+    setButtonType(.momentaryChange)
+    setTitle(title)
+  }
+
+  required init?(coder: NSCoder) {
+    nil
+  }
+
+  override var isHighlighted: Bool {
+    didSet { updateAppearance() }
+  }
+
+  override var isEnabled: Bool {
+    didSet {
+      updateAppearance()
+      window?.invalidateCursorRects(for: self)
+    }
+  }
+
+  func setTitle(_ value: String) {
+    displayTitle = value
+    setAccessibilityLabel(value)
+    updateAppearance()
+  }
+
+  override func updateTrackingAreas() {
+    super.updateTrackingAreas()
+    if let trackingArea { removeTrackingArea(trackingArea) }
+    let area = NSTrackingArea(
+      rect: bounds,
+      options: [.mouseEnteredAndExited, .activeInKeyWindow],
+      owner: self,
+      userInfo: nil
+    )
+    addTrackingArea(area)
+    trackingArea = area
+  }
+
+  override func mouseEntered(with event: NSEvent) {
+    pointerInside = true
+    updateAppearance()
+  }
+
+  override func mouseExited(with event: NSEvent) {
+    pointerInside = false
+    updateAppearance()
+  }
+
+  override func resetCursorRects() {
+    super.resetCursorRects()
+    if isEnabled { addCursorRect(bounds, cursor: .pointingHand) }
+  }
+
+  private func updateAppearance() {
+    let color: NSColor
+    if !isEnabled {
+      color = Brand.muted
+    } else if isHighlighted || pointerInside {
+      color = Brand.graphite
+    } else {
+      color = Brand.lilac
+    }
+    attributedTitle = NSAttributedString(
+      string: displayTitle,
+      attributes: [
+        .font: NSFont.systemFont(ofSize: 14, weight: .semibold),
+        .foregroundColor: color
+      ]
+    )
   }
 }
 

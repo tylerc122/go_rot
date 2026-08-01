@@ -20,6 +20,9 @@ Get Go Rot from [gorot.dev](https://gorot.dev):
 4. When Chrome opens, choose **Add to Chrome**. Go Rot detects the connection
    and confirms when setup is complete.
 
+To add, remove, or switch agents later, reopen Go Rot and choose **Change
+agents…**, or use **Go Rot → Change Agents…** from the app menu.
+
 Go Rot supports macOS 13 or newer, Google Chrome, Codex, and Claude Code.
 The Mac app includes everything it needs. If something does not connect, see
 [setup and support](https://gorot.dev/support.html).

@@ -23,7 +23,8 @@ test("macOS onboarding presents one guided primary action", () => {
 test("macOS onboarding explains both required product pieces", () => {
   assert.match(source, /Mac companion and the Chrome extension/);
   assert.match(source, /Choose Add to Chrome there/);
-  assert.match(source, /Mac companion and Chrome extension connected/);
+  assert.match(source, /activeAgentNames/);
+  assert.match(source, /connectedItems/);
   assert.match(source, /ONE QUICK SETUP/);
   assert.match(source, /Ready to rot/);
 });
@@ -71,8 +72,12 @@ test("interactive preview never fakes Chrome readiness", () => {
   assert.doesNotMatch(previewChromeCase, /showReady/);
 });
 
-test("repair and removal stay out of the first-run path", () => {
-  assert.match(source, /withTitle: "Repair Setup…"/);
+test("changing agents is discoverable without crowding the first-run path", () => {
+  assert.match(source, /withTitle: "Change Agents…"/);
+  assert.doesNotMatch(source, /withTitle: "Repair Setup…"/);
+  assert.match(source, /ActionLinkButton/);
+  assert.match(source, /secondaryButton\.setTitle\("Change agents…"\)/);
+  assert.match(source, /let installed = isPreview/);
   assert.match(source, /withTitle: "Remove Go Rot Setup…"/);
   assert.match(source, /let mainMenu = NSMenu\(\)/);
   assert.doesNotMatch(source, /let statusBox = NSBox/);
