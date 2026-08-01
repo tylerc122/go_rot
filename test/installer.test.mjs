@@ -218,6 +218,153 @@ test("installer preserves an existing Claude telemetry headers helper", () => {
   assert.match(JSON.stringify(installed.hooks), /GO_ROT_HOOK/);
 });
 
+test("installer configures only the agents explicitly selected", () => {
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), "go-rot-selected-agents-"));
+  const codexSettings = path.join(target, ".codex", "hooks.json");
+  const claudeSettings = path.join(target, ".claude", "settings.json");
+  fs.mkdirSync(path.dirname(codexSettings), { recursive: true });
+  fs.mkdirSync(path.dirname(claudeSettings), { recursive: true });
+  fs.writeFileSync(
+    codexSettings,
+    JSON.stringify({ keep: "codex", hooks: {} })
+  );
+  fs.writeFileSync(
+    claudeSettings,
+    JSON.stringify({ keep: "claude", env: { KEEP: "yes" }, hooks: {} })
+  );
+  const untouchedClaudeSettings = fs.readFileSync(claudeSettings, "utf8");
+
+  runInstaller(target, "configure", "--codex");
+  let codex = JSON.parse(fs.readFileSync(codexSettings, "utf8"));
+  let claude = JSON.parse(fs.readFileSync(claudeSettings, "utf8"));
+  assert.match(JSON.stringify(codex), /GO_ROT_HOOK/);
+  assert.doesNotMatch(JSON.stringify(claude), /GO_ROT_HOOK/);
+  assert.equal(claude.keep, "claude");
+  assert.deepEqual(claude.env, { KEEP: "yes" });
+  assert.equal(fs.readFileSync(claudeSettings, "utf8"), untouchedClaudeSettings);
+  assert.equal(fs.existsSync(claudeOtelConfigPath(target)), false);
+  assert.equal(fs.existsSync(nativeManifestPath(target)), true);
+
+  runInstaller(target, "configure", "--claude");
+  codex = JSON.parse(fs.readFileSync(codexSettings, "utf8"));
+  claude = JSON.parse(fs.readFileSync(claudeSettings, "utf8"));
+  assert.doesNotMatch(JSON.stringify(codex), /GO_ROT_HOOK/);
+  assert.match(JSON.stringify(claude), /GO_ROT_HOOK/);
+  assert.equal(codex.keep, "codex");
+  assert.equal(claude.keep, "claude");
+  assert.equal(fs.existsSync(claudeOtelConfigPath(target)), true);
+
+  runInstaller(target, "configure", ["--codex", "--claude"]);
+  codex = JSON.parse(fs.readFileSync(codexSettings, "utf8"));
+  claude = JSON.parse(fs.readFileSync(claudeSettings, "utf8"));
+  assert.match(JSON.stringify(codex), /GO_ROT_HOOK/);
+  assert.match(JSON.stringify(claude), /GO_ROT_HOOK/);
+});
+
+test("installer replaces legacy FirstTok hooks, telemetry, and native files", () => {
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), "go-rot-legacy-"));
+  const legacyConfig = {
+    version: 1,
+    host: "127.0.0.1",
+    port: 54321,
+    token: "a".repeat(64)
+  };
+  const legacySupport = path.join(
+    target,
+    "Library",
+    "Application Support",
+    "FirstTok"
+  );
+  const legacyManifest = path.join(
+    target,
+    "Library",
+    "Application Support",
+    "Google",
+    "Chrome",
+    "NativeMessagingHosts",
+    "com.firsttok.companion.json"
+  );
+  const legacyHook = {
+    hooks: [
+      {
+        type: "command",
+        command: "FIRSTTOK_HOOK=1 /tmp/firsttok-hook.mjs",
+        timeout: 2
+      }
+    ]
+  };
+  fs.mkdirSync(legacySupport, { recursive: true });
+  fs.mkdirSync(path.dirname(legacyManifest), { recursive: true });
+  fs.mkdirSync(path.join(target, ".codex"), { recursive: true });
+  fs.mkdirSync(path.join(target, ".claude"), { recursive: true });
+  fs.writeFileSync(
+    path.join(legacySupport, "claude-otel.json"),
+    `${JSON.stringify(legacyConfig)}\n`
+  );
+  fs.writeFileSync(
+    path.join(legacySupport, "firsttok-native-host"),
+    "#!/bin/sh\nexit 0\n",
+    { mode: 0o700 }
+  );
+  fs.writeFileSync(
+    legacyManifest,
+    `${JSON.stringify({
+      name: "com.firsttok.companion",
+      path: path.join(legacySupport, "firsttok-native-host"),
+      type: "stdio",
+      allowed_origins: [
+        "chrome-extension://kdioecoelofnlhihkiadpmknlfdmmopn/"
+      ]
+    })}\n`
+  );
+  fs.writeFileSync(
+    path.join(target, ".codex", "hooks.json"),
+    `${JSON.stringify({ hooks: { Stop: [legacyHook] }, keep: "codex" })}\n`
+  );
+  fs.writeFileSync(
+    path.join(target, ".claude", "settings.json"),
+    `${JSON.stringify({
+      hooks: { Stop: [legacyHook] },
+      env: { KEEP: "claude", ...claudeOtelEnvironment(legacyConfig) }
+    })}\n`
+  );
+
+  runInstaller(target, "install", "--all");
+  const codex = JSON.parse(
+    fs.readFileSync(path.join(target, ".codex", "hooks.json"), "utf8")
+  );
+  const claude = JSON.parse(
+    fs.readFileSync(path.join(target, ".claude", "settings.json"), "utf8")
+  );
+  assert.equal(JSON.stringify(codex).includes("FIRSTTOK_HOOK"), false);
+  assert.equal(JSON.stringify(claude).includes("FIRSTTOK_HOOK"), false);
+  assert.match(JSON.stringify(codex), /GO_ROT_HOOK/);
+  assert.match(JSON.stringify(claude), /GO_ROT_HOOK/);
+  assert.equal(codex.keep, "codex");
+  assert.equal(claude.env.KEEP, "claude");
+  assert.deepEqual(
+    Object.fromEntries(
+      CLAUDE_OTEL_ENVIRONMENT_KEYS.map((key) => [key, claude.env[key]])
+    ),
+    claudeOtelEnvironment(readClaudeOtelConfig(target))
+  );
+  assert.equal(fs.existsSync(legacyManifest), false);
+  assert.equal(fs.existsSync(path.join(legacySupport, "firsttok-native-host")), false);
+  assert.equal(fs.existsSync(path.join(legacySupport, "claude-otel.json")), false);
+
+  runInstaller(target, "uninstall", "--all");
+  const removedCodex = JSON.parse(
+    fs.readFileSync(path.join(target, ".codex", "hooks.json"), "utf8")
+  );
+  const removedClaude = JSON.parse(
+    fs.readFileSync(path.join(target, ".claude", "settings.json"), "utf8")
+  );
+  assert.equal(JSON.stringify(removedCodex).includes("GO_ROT_HOOK"), false);
+  assert.equal(JSON.stringify(removedClaude).includes("GO_ROT_HOOK"), false);
+  assert.equal(removedCodex.keep, "codex");
+  assert.deepEqual(removedClaude.env, { KEEP: "claude" });
+});
+
 test("installed native launcher resolves Node with Chrome's sparse GUI PATH", () => {
   const target = fs.mkdtempSync(path.join(os.tmpdir(), "go-rot-gui-path-"));
   runInstaller(target, "install", "--native");
@@ -287,9 +434,10 @@ test("production install points Chrome at the bundled host and public extension"
 });
 
 function runInstaller(home, action, target, environment = {}) {
+  const targets = Array.isArray(target) ? target : [target];
   const result = spawnSync(
     process.execPath,
-    [path.join(root, "scripts", "install.mjs"), action, target],
+    [path.join(root, "scripts", "install.mjs"), action, ...targets],
     {
       cwd: root,
       env: { ...process.env, GO_ROT_HOME: home, ...environment },

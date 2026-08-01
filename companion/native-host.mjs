@@ -3,6 +3,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import net from "node:net";
+import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -10,6 +11,7 @@ import {
   MAX_MESSAGE_BYTES,
   NATIVE_HOST_NAME,
   PROTOCOL_VERSION,
+  readinessPath,
   runtimeDirectory,
   socketPath,
   statePath
@@ -38,6 +40,7 @@ await prepareRuntime();
 await startDecisionReceiver();
 startNativeInput();
 await startSocketServer();
+writeReadinessIdentity();
 sendNative({
   type: "companion.ready",
   protocolVersion: PROTOCOL_VERSION,
@@ -557,6 +560,50 @@ function cleanupSocket() {
   } catch {
     // Cleanup is best effort.
   }
+  try {
+    fs.rmSync(readinessPath(), { force: true });
+  } catch {
+    // Cleanup is best effort.
+  }
+}
+
+function writeReadinessIdentity() {
+  fs.writeFileSync(
+    readinessPath(),
+    `${JSON.stringify({
+      host: NATIVE_HOST_NAME,
+      protocolVersion: PROTOCOL_VERSION,
+      extensionId: installedExtensionId(),
+      pid: process.pid
+    })}\n`,
+    { mode: 0o600 }
+  );
+  fs.chmodSync(readinessPath(), 0o600);
+}
+
+function installedExtensionId() {
+  const home = process.env.GO_ROT_HOME
+    ? path.resolve(process.env.GO_ROT_HOME)
+    : os.homedir();
+  const manifestPath = path.join(
+    home,
+    "Library",
+    "Application Support",
+    "Google",
+    "Chrome",
+    "NativeMessagingHosts",
+    `${NATIVE_HOST_NAME}.json`
+  );
+  try {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    for (const origin of manifest.allowed_origins ?? []) {
+      const match = String(origin).match(/^chrome-extension:\/\/([a-p]{32})\/$/);
+      if (match) return match[1];
+    }
+  } catch {
+    // A process without an installed extension identity cannot report ready.
+  }
+  return null;
 }
 
 function shutdown() {

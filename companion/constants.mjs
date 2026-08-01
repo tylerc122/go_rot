@@ -18,3 +18,7 @@ export function socketPath() {
 export function statePath() {
   return path.join(runtimeDirectory(), "state.json");
 }
+
+export function readinessPath() {
+  return path.join(runtimeDirectory(), "companion.json");
+}

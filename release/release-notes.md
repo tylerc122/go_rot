@@ -7,9 +7,13 @@ the agent needs attention, and closes the feed when every tracked task is done.
 
 1. Download `go-rot-macos-v0.1.1.pkg` and run it.
 2. Open **Go Rot** from Applications.
-3. Choose **Install or repair setup**, then **Check readiness**.
-4. Add Go Rot from the Chrome Web Store and pin it to the toolbar.
-5. Approve the Go Rot hooks when Codex or Claude asks.
+3. Choose **Set up Go Rot**, then select Codex, Claude, or both. Only the
+   selected agent settings receive Go Rot hooks.
+4. Choose **Install selected**. The app installs the local companion and opens
+   Chrome automatically.
+5. Choose **Add to Chrome** in the Chrome Web Store. The Mac app confirms when
+   both pieces are connected.
+6. Approve the Go Rot hooks if Codex or Claude asks the first time you use it.
 
 The macOS package contains universal Apple silicon and Intel executables and a
 pinned runtime. No separate Node.js installation or Go Rot account is required.

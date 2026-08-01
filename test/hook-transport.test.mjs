@@ -27,6 +27,27 @@ test("hook events travel through the local companion to native messaging", async
     `${JSON.stringify(otelConfig)}\n`,
     { mode: 0o600 }
   );
+  const nativeManifest = path.join(
+    home,
+    "Library",
+    "Application Support",
+    "Google",
+    "Chrome",
+    "NativeMessagingHosts",
+    "dev.gorot.companion.json"
+  );
+  fs.mkdirSync(path.dirname(nativeManifest), { recursive: true });
+  fs.writeFileSync(
+    nativeManifest,
+    `${JSON.stringify({
+      name: "dev.gorot.companion",
+      type: "stdio",
+      path: process.execPath,
+      allowed_origins: [
+        "chrome-extension://kdioecoelofnlhihkiadpmknlfdmmopn/"
+      ]
+    })}\n`
+  );
   const environment = {
     ...process.env,
     GO_ROT_HOME: home,
@@ -53,6 +74,15 @@ test("hook events travel through the local companion to native messaging", async
   assert.equal(
     fs.statSync(path.join(runtime, "companion.sock")).mode & 0o777,
     0o600
+  );
+  assert.deepEqual(
+    JSON.parse(fs.readFileSync(path.join(runtime, "companion.json"), "utf8")),
+    {
+      host: "dev.gorot.companion",
+      protocolVersion: 1,
+      extensionId: "kdioecoelofnlhihkiadpmknlfdmmopn",
+      pid: host.pid
+    }
   );
 
   const hook = spawn(

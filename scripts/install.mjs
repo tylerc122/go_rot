@@ -12,6 +12,7 @@ import {
   claudeOtelConfigPath,
   claudeOtelEnvironment,
   createClaudeOtelConfig,
+  normalizeClaudeOtelConfig,
   readClaudeOtelConfig
 } from "../companion/claude-otel-config.mjs";
 
@@ -25,34 +26,53 @@ const productionAppBundle = process.env.GO_ROT_APP_BUNDLE
 const targetHome = process.env.GO_ROT_HOME
   ? path.resolve(process.env.GO_ROT_HOME)
   : os.homedir();
-const [action = "install", target = "--all"] = process.argv.slice(2);
-const targets =
-  target === "--all"
-    ? action === "uninstall"
-      ? ["claude", "codex", "native"]
-      : ["native", "codex", "claude"]
-    : [target.replace(/^--/, "")];
+const [action = "install", ...targetArguments] = process.argv.slice(2);
+const usage =
+  "Usage: node scripts/install.mjs <install|uninstall> " +
+  "[--all|--native|--codex|--claude] or configure <--codex|--claude>";
 
-if (!["install", "uninstall"].includes(action)) {
-  fail("Usage: node scripts/install.mjs <install|uninstall> [--all|--native|--codex|--claude]");
+if (!["install", "uninstall", "configure"].includes(action)) fail(usage);
+
+if (action === "configure") {
+  const selectedAgents = [...new Set(targetArguments.map(parseTarget))];
+  if (
+    selectedAgents.length === 0 ||
+    selectedAgents.some((item) => !["codex", "claude"].includes(item))
+  ) {
+    fail(usage);
+  }
+  await configureAgentSetup(selectedAgents);
+  console.log("");
+  console.log(`Configured Go Rot for: ${selectedAgents.join(", ")}.`);
+} else {
+  const target = targetArguments[0] ?? "--all";
+  if (targetArguments.length > 1) fail(usage);
+  const targets =
+    target === "--all"
+      ? action === "uninstall"
+        ? ["claude", "codex", "native"]
+        : ["native", "codex", "claude"]
+      : [parseTarget(target)];
+
+  for (const item of targets) {
+    if (!["native", "codex", "claude"].includes(item)) {
+      fail(`Unknown install target: ${item}`);
+    }
+    if (action === "install") {
+      if (item === "native") await installNativeHost();
+      if (item === "codex") installHooks("codex");
+      if (item === "claude") installHooks("claude-code");
+    } else {
+      if (item === "native") uninstallNativeHost();
+      if (item === "codex") uninstallHooks("codex");
+      if (item === "claude") uninstallHooks("claude-code");
+    }
+  }
+
+  if (action === "install") printInstallSummary(targets);
 }
 
-for (const item of targets) {
-  if (!["native", "codex", "claude"].includes(item)) {
-    fail(`Unknown install target: ${item}`);
-  }
-  if (action === "install") {
-    if (item === "native") await installNativeHost();
-    if (item === "codex") installHooks("codex");
-    if (item === "claude") installHooks("claude-code");
-  } else {
-    if (item === "native") uninstallNativeHost();
-    if (item === "codex") uninstallHooks("codex");
-    if (item === "claude") uninstallHooks("claude-code");
-  }
-}
-
-if (action === "install") {
+function printInstallSummary(targets) {
   console.log("");
   console.log(
     targets.length === 3
@@ -87,18 +107,40 @@ if (action === "install") {
   }
 }
 
-async function installNativeHost() {
+function parseTarget(argument) {
+  return argument.replace(/^--/, "");
+}
+
+async function configureAgentSetup(selectedAgents) {
+  const includesClaude = selectedAgents.includes("claude");
+  await installNativeHost({ prepareClaudeReceiver: includesClaude });
+
+  if (selectedAgents.includes("codex")) installHooks("codex");
+  else uninstallHooks("codex");
+
+  if (includesClaude) {
+    installHooks("claude-code");
+  } else {
+    uninstallHooks("claude-code");
+    removeExactFile(claudeOtelConfigPath(targetHome));
+    removeExactFile(legacyClaudeOtelConfigPath());
+  }
+}
+
+async function installNativeHost({ prepareClaudeReceiver = true } = {}) {
   if (process.platform !== "darwin") {
     fail("The Go Rot installer currently supports macOS only.");
   }
-  let receiverConfig = readClaudeOtelConfig(targetHome);
-  if (!receiverConfig) {
-    receiverConfig = createClaudeOtelConfig(await findAvailableLoopbackPort());
+  if (prepareClaudeReceiver) {
+    let receiverConfig = readClaudeOtelConfig(targetHome);
+    if (!receiverConfig) {
+      receiverConfig = createClaudeOtelConfig(await findAvailableLoopbackPort());
+    }
+    fs.mkdirSync(path.dirname(claudeOtelConfigPath(targetHome)), {
+      recursive: true
+    });
+    writeJson(claudeOtelConfigPath(targetHome), receiverConfig);
   }
-  fs.mkdirSync(path.dirname(claudeOtelConfigPath(targetHome)), {
-    recursive: true
-  });
-  writeJson(claudeOtelConfigPath(targetHome), receiverConfig);
 
   const launcher = nativeLauncherPath();
   if (productionAppBundle) {
@@ -130,14 +172,21 @@ async function installNativeHost() {
     type: "stdio",
     allowed_origins: [`chrome-extension://${extensionId()}/`]
   });
+  removeExactFile(legacyNativeManifestPath());
+  removeExactFile(legacyInstalledNativeLauncherPath());
   console.log(`Installed Chrome companion: ${manifestPath}`);
-  console.log("Prepared Claude's authenticated local decision receiver.");
+  if (prepareClaudeReceiver) {
+    console.log("Prepared Claude's authenticated local decision receiver.");
+  }
 }
 
 function uninstallNativeHost() {
   removeExactFile(nativeManifestPath());
   removeExactFile(installedNativeLauncherPath());
   removeExactFile(claudeOtelConfigPath(targetHome));
+  removeExactFile(legacyNativeManifestPath());
+  removeExactFile(legacyInstalledNativeLauncherPath());
+  removeExactFile(legacyClaudeOtelConfigPath());
   console.log(`Removed Chrome companion manifest: ${nativeManifestPath()}`);
 }
 
@@ -191,25 +240,39 @@ function uninstallHooks(provider) {
   const destination = hookConfigPath(provider);
   const config = readJson(destination, null);
   if (!config) return;
+  let changed = false;
   if (config.hooks) {
     for (const [event, entries] of Object.entries(config.hooks)) {
-      removeGoRotEntries(entries);
-      if (entries.length === 0) delete config.hooks[event];
+      const removed = removeGoRotEntries(entries);
+      if (removed > 0) {
+        changed = true;
+        if (entries.length === 0) delete config.hooks[event];
+      }
     }
   }
   if (provider === "claude-code") {
-    removeClaudeDecisionEnvironment(config);
+    changed = removeClaudeDecisionEnvironment(config) || changed;
   }
+  if (!changed) return;
   writeJson(destination, config);
   console.log(`Removed Go Rot hooks from: ${destination}`);
 }
 
 function removeGoRotEntries(entries) {
-  if (!Array.isArray(entries)) return;
+  if (!Array.isArray(entries)) return 0;
+  let removed = 0;
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const serialized = JSON.stringify(entries[index]);
-    if (serialized.includes("GO_ROT_HOOK")) entries.splice(index, 1);
+    if (
+      serialized.includes("GO_ROT_HOOK") ||
+      serialized.includes("FIRSTTOK_HOOK") ||
+      serialized.includes("firsttok-hook.mjs")
+    ) {
+      entries.splice(index, 1);
+      removed += 1;
+    }
   }
+  return removed;
 }
 
 function hookCommand(provider) {
@@ -233,6 +296,7 @@ function configureClaudeDecisionEvents(settings) {
     settings.env && typeof settings.env === "object" && !Array.isArray(settings.env)
       ? settings.env
       : {};
+  removeLegacyClaudeDecisionEnvironment(environment);
   const alreadyConfigured = Object.entries(desired).every(
     ([key, value]) => String(environment[key]) === value
   );
@@ -256,6 +320,7 @@ function configureClaudeDecisionEvents(settings) {
     return false;
   }
   settings.env = { ...environment, ...desired };
+  removeExactFile(legacyClaudeOtelConfigPath());
   console.log(
     "Configured native Claude permission decisions for ordinary `claude` sessions."
   );
@@ -263,15 +328,48 @@ function configureClaudeDecisionEvents(settings) {
 }
 
 function removeClaudeDecisionEnvironment(settings) {
+  if (!settings.env || typeof settings.env !== "object") {
+    return false;
+  }
+  let changed = false;
   const receiverConfig = readClaudeOtelConfig(targetHome);
-  if (!receiverConfig || !settings.env || typeof settings.env !== "object") {
-    return;
+  if (receiverConfig) {
+    changed = removeExactClaudeDecisionEnvironment(
+      settings.env,
+      claudeOtelEnvironment(receiverConfig)
+    ) || changed;
   }
-  const owned = claudeOtelEnvironment(receiverConfig);
-  for (const key of CLAUDE_OTEL_ENVIRONMENT_KEYS) {
-    if (String(settings.env[key]) === owned[key]) delete settings.env[key];
+  changed = removeLegacyClaudeDecisionEnvironment(settings.env) || changed;
+  if (changed && Object.keys(settings.env).length === 0) delete settings.env;
+  return changed;
+}
+
+function removeLegacyClaudeDecisionEnvironment(environment) {
+  const legacyConfig = readLegacyClaudeOtelConfig();
+  if (!legacyConfig) return false;
+  return removeExactClaudeDecisionEnvironment(
+    environment,
+    claudeOtelEnvironment(legacyConfig)
+  );
+}
+
+function removeExactClaudeDecisionEnvironment(environment, owned) {
+  const matches = CLAUDE_OTEL_ENVIRONMENT_KEYS.every(
+    (key) => String(environment[key]) === owned[key]
+  );
+  if (!matches) return false;
+  for (const key of CLAUDE_OTEL_ENVIRONMENT_KEYS) delete environment[key];
+  return true;
+}
+
+function readLegacyClaudeOtelConfig() {
+  try {
+    return normalizeClaudeOtelConfig(
+      JSON.parse(fs.readFileSync(legacyClaudeOtelConfigPath(), "utf8"))
+    );
+  } catch {
+    return null;
   }
-  if (Object.keys(settings.env).length === 0) delete settings.env;
 }
 
 function isClaudeTelemetryKey(key) {
@@ -299,6 +397,18 @@ function nativeManifestPath() {
   );
 }
 
+function legacyNativeManifestPath() {
+  return path.join(
+    targetHome,
+    "Library",
+    "Application Support",
+    "Google",
+    "Chrome",
+    "NativeMessagingHosts",
+    "com.firsttok.companion.json"
+  );
+}
+
 function installedNativeLauncherPath() {
   return path.join(
     targetHome,
@@ -306,6 +416,26 @@ function installedNativeLauncherPath() {
     "Application Support",
     "Go Rot",
     "go-rot-native-host"
+  );
+}
+
+function legacyInstalledNativeLauncherPath() {
+  return path.join(
+    targetHome,
+    "Library",
+    "Application Support",
+    "FirstTok",
+    "firsttok-native-host"
+  );
+}
+
+function legacyClaudeOtelConfigPath() {
+  return path.join(
+    targetHome,
+    "Library",
+    "Application Support",
+    "FirstTok",
+    "claude-otel.json"
   );
 }
 
