@@ -20,7 +20,6 @@ test("clamps untrusted settings and falls back to a known provider", () => {
     }),
     {
       enabled: false,
-      agents: DEFAULT_SETTINGS.agents,
       pausedUntil: DEFAULT_SETTINGS.pausedUntil,
       provider: "youtube",
       shuffleFeeds: DEFAULT_SETTINGS.shuffleFeeds,
@@ -57,9 +56,9 @@ test("rotates predictably through enabled feeds", () => {
   );
 });
 
-test("supports global pause and independent agent toggles", () => {
+test("supports global pause without duplicating installed-agent controls", () => {
   const settings = clampSettings({
-    agents: { codex: false, "claude-code": true },
+    agents: { codex: false, "claude-code": false },
     pausedUntil: 5000
   });
 
@@ -67,10 +66,7 @@ test("supports global pause and independent agent toggles", () => {
     sessionEligibility(settings, { agent: "claude-code" }, 4000),
     "paused"
   );
-  assert.equal(
-    sessionEligibility(settings, { agent: "codex" }, 6000),
-    "agent-disabled"
-  );
+  assert.equal(sessionEligibility(settings, { agent: "codex" }, 6000), "eligible");
   assert.equal(
     sessionEligibility(settings, { agent: "claude-code" }, 6000),
     "eligible"

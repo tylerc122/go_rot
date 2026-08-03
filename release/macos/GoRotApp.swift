@@ -37,6 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var agentPicker: AgentSelectionView!
   private var primaryButton: BrandButton!
   private var secondaryButton: ActionLinkButton!
+  private var uninstallButton: ActionLinkButton!
   private var progressView: SetupProgressView!
   private var readinessTimer: Timer?
   private var primaryAction: (() -> Void)?
@@ -147,6 +148,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     secondaryButton.translatesAutoresizingMaskIntoConstraints = false
     secondaryButton.isHidden = true
 
+    uninstallButton = ActionLinkButton(
+      title: "Uninstall Go Rot…",
+      target: self,
+      action: #selector(removeSetupPressed)
+    )
+    uninstallButton.translatesAutoresizingMaskIntoConstraints = false
+    uninstallButton.isHidden = true
+
     let copyStack = NSStackView(
       views: [
         eyebrowLabel,
@@ -154,7 +163,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         bodyLabel,
         stateLabel,
         primaryButton,
-        secondaryButton
+        secondaryButton,
+        uninstallButton
       ]
     )
     copyStack.orientation = .vertical
@@ -246,6 +256,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       primaryButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 190),
       primaryButton.heightAnchor.constraint(equalToConstant: 54),
       secondaryButton.heightAnchor.constraint(equalToConstant: 36),
+      uninstallButton.heightAnchor.constraint(equalToConstant: 30),
 
       footerRow.leadingAnchor.constraint(equalTo: canvas.leadingAnchor, constant: 42),
       footerRow.trailingAnchor.constraint(lessThanOrEqualTo: canvas.trailingAnchor, constant: -42),
@@ -273,7 +284,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       keyEquivalent: ""
     ).target = self
     appMenu.addItem(
-      withTitle: "Remove Go Rot Setup…",
+      withTitle: "Uninstall Go Rot…",
       action: #selector(removeSetupPressed),
       keyEquivalent: ""
     ).target = self
@@ -401,6 +412,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       action: { NSApp.terminate(nil) }
     )
     showChangeAgentsAction()
+    showUninstallAction()
     if requestNotifications && !isPreview {
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
         UNUserNotificationCenter.current().requestAuthorization(
@@ -451,6 +463,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     primaryButton.isEnabled = buttonEnabled
     primaryButton.isHidden = button.isEmpty
     secondaryButton.isHidden = true
+    uninstallButton.isHidden = true
     footerLabel.stringValue = footer
     heroImage.image = stage == .failure ? failureImage() : spiralImage()
     heroImage.contentTintColor = stage == .failure ? Brand.danger : nil
@@ -479,6 +492,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     secondaryAction = { [weak self] in self?.presentAgentChoice() }
     secondaryButton.setTitle("Change agents…")
     secondaryButton.isHidden = false
+  }
+
+  private func showUninstallAction() {
+    uninstallButton.isHidden = false
   }
 
   @objc private func agentSelectionChanged() {
@@ -556,9 +573,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   @objc private func removeSetupPressed() {
     let alert = NSAlert()
-    alert.messageText = "Remove Go Rot setup?"
-    alert.informativeText = "This removes Go Rot’s agent hooks and local Chrome companion. Unrelated Codex and Claude settings stay intact."
-    alert.addButton(withTitle: "Remove setup")
+    alert.messageText = "Uninstall Go Rot?"
+    alert.informativeText = "This removes Go Rot’s agent hooks and local Chrome companion, then moves Go Rot.app to Trash. Unrelated Codex and Claude settings stay intact."
+    alert.addButton(withTitle: "Uninstall")
     alert.addButton(withTitle: "Keep Go Rot")
     alert.alertStyle = .warning
     guard alert.runModal() == .alertFirstButtonReturn else { return }
@@ -797,29 +814,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private func showMisplacedApplication() {
     render(
       stage: .failure,
-      eyebrow: "OPEN THE INSTALLED APP",
-      headline: "This is a build copy.",
-      body: "Go Rot must run from Applications so Codex and Chrome always point to the same signed app. Use the installer package to put it there.",
-      state: "Nothing has been changed.",
-      button: "Get the installer",
+      eyebrow: "ONE QUICK MOVE",
+      headline: "Put Go Rot in Applications.",
+      body: "Drag Go Rot.app into Applications, then open that copy. This keeps Codex and Chrome pointed at one stable signed app.",
+      state: "Setup hasn’t started yet.",
+      button: "Open Applications",
       buttonEnabled: true,
-      footer: "The installed copy will open automatically next time",
-      action: { [weak self] in self?.openInstaller() }
+      footer: "Go Rot only adds hooks after you choose an agent",
+      action: { [weak self] in self?.openApplicationsFolder() }
     )
   }
 
-  private func openInstaller() {
-    let dist = Bundle.main.bundleURL
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-    if let package = (try? FileManager.default.contentsOfDirectory(
-      at: dist,
-      includingPropertiesForKeys: nil
-    ))?.first(where: { $0.lastPathComponent.hasPrefix("go-rot-macos-") && $0.pathExtension == "pkg" }) {
-      NSWorkspace.shared.open(package)
-    } else {
-      NSWorkspace.shared.open(URL(string: "https://gorot.dev/")!)
-    }
+  private func openApplicationsFolder() {
+    NSWorkspace.shared.open(
+      URL(fileURLWithPath: "/Applications", isDirectory: true)
+    )
   }
 
   private func codexCLIURL() -> URL? {

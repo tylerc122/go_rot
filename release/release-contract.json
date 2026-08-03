@@ -1,10 +1,10 @@
 {
   "productName": "Go Rot",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "artifactSlug": "go-rot",
   "delivery": {
-    "format": "signed-notarized-pkg",
-    "artifactName": "go-rot-macos-v0.1.1.pkg",
+    "format": "signed-notarized-dmg",
+    "artifactName": "go-rot-macos-v0.1.2.dmg",
     "applicationPath": "/Applications/Go Rot.app",
     "bundleRuntime": true,
     "architectures": [
@@ -30,7 +30,6 @@
   },
   "identifiers": {
     "appBundle": "dev.gorot.app",
-    "installerPackage": "dev.gorot.pkg",
     "nativeMessagingHost": "dev.gorot.companion",
     "chromeExtension": "aelnemadklcpfldiphgoblnkonmebinm",
     "chromeExtensionDevelopment": "kdioecoelofnlhihkiadpmknlfdmmopn"

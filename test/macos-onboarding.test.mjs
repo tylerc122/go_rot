@@ -81,7 +81,9 @@ test("Codex setup requires real hook approval before readiness", () => {
 test("loose release builds cannot silently become the production app", () => {
   assert.match(source, /\/Applications\/Go Rot\.app/);
   assert.match(source, /GO_ROT_ALLOW_LOOSE_APP/);
-  assert.match(source, /This is a build copy/);
+  assert.match(source, /ONE QUICK MOVE/);
+  assert.match(source, /Drag Go Rot\.app into Applications/);
+  assert.match(source, /button: "Open Applications"/);
   assert.match(source, /redirectToInstalledApplication/);
 });
 
@@ -98,8 +100,11 @@ test("changing agents is discoverable without crowding the first-run path", () =
   assert.doesNotMatch(source, /withTitle: "Repair Setup…"/);
   assert.match(source, /ActionLinkButton/);
   assert.match(source, /secondaryButton\.setTitle\("Change agents…"\)/);
+  assert.match(source, /uninstallButton = ActionLinkButton/);
+  assert.match(source, /showUninstallAction\(\)/);
   assert.match(source, /let installed = isPreview/);
-  assert.match(source, /withTitle: "Remove Go Rot Setup…"/);
+  assert.match(source, /withTitle: "Uninstall Go Rot…"/);
+  assert.match(source, /then moves Go Rot\.app to Trash/);
   assert.match(source, /let mainMenu = NSMenu\(\)/);
   assert.doesNotMatch(source, /let statusBox = NSBox/);
 });

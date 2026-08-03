@@ -1,4 +1,4 @@
-# Chrome Web Store Submission: Go Rot 0.1.1
+# Chrome Web Store Submission: Go Rot 0.1.2
 
 ## Store listing
 
@@ -9,7 +9,7 @@
 **Visibility:** Public
 
 **Publishing:** Deferred (stage after review, then publish with the signed Mac
-installer and website)
+disk image and website)
 
 **Summary:** Open your short-form feed while Codex or Claude works, then return
 when the agent needs you.
@@ -66,12 +66,12 @@ asks for them.
 ## Submission sequence
 
 1. Register and verify the Chrome Web Store publisher account.
-2. Upload `dist/go-rot-chrome-v0.1.1.zip` to the existing item.
+2. Upload `dist/go-rot-chrome-v0.1.2.zip` to the existing item.
 3. Copy the assigned item ID into
    `release/release-contract.json` as `identifiers.chromeExtension`. The local
    development ID remains separate.
 4. Add the listing copy, privacy declarations, permission justifications, and
    images from `release/chrome-store/assets/`.
 5. Use public visibility and deferred publishing.
-6. Submit for review. Do not publish until the signed/notarized Mac package and
+6. Submit for review. Do not publish until the signed/notarized Mac disk image and
    live website URLs pass the release-candidate check.

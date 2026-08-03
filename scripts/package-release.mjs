@@ -17,25 +17,24 @@ const buildRoot = path.join(root, "dist", "release");
 const application = path.join(buildRoot, `${contract.productName}.app`);
 const artifact = path.join(root, "dist", contract.delivery.artifactName);
 const checksumArtifact = `${artifact}.sha256`;
-const componentPackage = path.join(root, "dist", ".go-rot-component.pkg");
-const componentPlist = path.join(root, "dist", ".go-rot-components.plist");
+const diskImageRoot = path.join(root, "dist", ".go-rot-dmg");
 
 fs.mkdirSync(cache, { recursive: true });
 fs.rmSync(buildRoot, { recursive: true, force: true });
 fs.mkdirSync(buildRoot, { recursive: true });
 fs.rmSync(artifact, { force: true });
 fs.rmSync(checksumArtifact, { force: true });
-fs.rmSync(componentPackage, { recursive: true, force: true });
-fs.rmSync(componentPlist, { force: true });
+fs.rmSync(diskImageRoot, { recursive: true, force: true });
 
 const runtimeArchives = prepareRuntimeArchives();
 buildApplication(runtimeArchives);
 signApplicationIfRequested();
-buildPackage();
+buildDiskImage();
+signDiskImageIfRequested();
 notarizeIfRequested();
 writeChecksum();
 verifyOutput();
-removePackageIntermediates();
+removeDiskImageIntermediates();
 
 console.log(`Created ${application}`);
 console.log(`Created ${artifact}`);
@@ -208,49 +207,36 @@ function signApplicationIfRequested() {
   run("/usr/bin/codesign", ["--force", "--timestamp", "--options", "runtime", "--sign", identity, application]);
 }
 
-function buildPackage() {
-  writeComponentPlist();
-  run(
-    "/usr/bin/pkgbuild",
-    [
-      "--root", buildRoot,
-      "--component-plist", componentPlist,
-      "--identifier", contract.identifiers.appBundle,
-      "--version", contract.version,
-      "--install-location", "/Applications",
-      componentPackage
-    ],
-    { env: { ...process.env, COPYFILE_DISABLE: "1" } }
-  );
-
-  const args = [];
-  if (options.sign) {
-    const identity = process.env.GO_ROT_INSTALLER_SIGNING_IDENTITY;
-    if (!identity) fail("GO_ROT_INSTALLER_SIGNING_IDENTITY is required with --sign");
-    args.push("--sign", identity);
-  }
-  args.push(
-    "--identifier", contract.identifiers.installerPackage,
-    "--version", contract.version,
-    "--package", componentPackage,
+function buildDiskImage() {
+  fs.mkdirSync(diskImageRoot, { recursive: true });
+  run("/usr/bin/ditto", [
+    application,
+    path.join(diskImageRoot, `${contract.productName}.app`)
+  ]);
+  fs.symlinkSync("/Applications", path.join(diskImageRoot, "Applications"));
+  run("/usr/bin/hdiutil", [
+    "create",
+    "-quiet",
+    "-ov",
+    "-fs", "HFS+",
+    "-format", "UDZO",
+    "-imagekey", "zlib-level=9",
+    "-volname", contract.productName,
+    "-srcfolder", diskImageRoot,
     artifact
-  );
-  run("/usr/bin/productbuild", args, {
-    env: { ...process.env, COPYFILE_DISABLE: "1" }
-  });
+  ]);
 }
 
-function writeComponentPlist() {
-  fs.writeFileSync(componentPlist, `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><array><dict>
-<key>RootRelativeBundlePath</key><string>${xmlEscape(contract.productName)}.app</string>
-<key>BundleIsRelocatable</key><false/>
-<key>BundleIsVersionChecked</key><false/>
-<key>BundleHasStrictIdentifier</key><true/>
-<key>BundleOverwriteAction</key><string>upgrade</string>
-</dict></array></plist>
-`);
+function signDiskImageIfRequested() {
+  if (!options.sign) return;
+  const identity = process.env.GO_ROT_APP_SIGNING_IDENTITY;
+  if (!identity) fail("GO_ROT_APP_SIGNING_IDENTITY is required with --sign");
+  run("/usr/bin/codesign", [
+    "--force",
+    "--timestamp",
+    "--sign", identity,
+    artifact
+  ]);
 }
 
 function notarizeIfRequested() {
@@ -279,39 +265,55 @@ function verifyOutput() {
     const result = run(runtime, ["--version"], { capture: true });
     if (result.trim() !== `v${contract.runtime.version}`) fail(`Wrong bundled runtime for ${architecture}`);
   }
-  run("/usr/sbin/pkgutil", ["--payload-files", artifact], { capture: true });
-  const expansionRoot = fs.mkdtempSync(path.join(os.tmpdir(), "go-rot-component-"));
-  const expanded = path.join(expansionRoot, "expanded");
+  run("/usr/bin/hdiutil", ["verify", artifact]);
+  const mountRoot = fs.mkdtempSync(path.join(os.tmpdir(), "go-rot-dmg-mount-"));
+  let diskImageProblem = null;
   try {
-    run("/usr/sbin/pkgutil", ["--expand", componentPackage, expanded], {
-      capture: true
-    });
-    const packageInfo = fs.readFileSync(path.join(expanded, "PackageInfo"), "utf8");
-    if (!packageInfo.includes('relocatable="false"')) {
-      fail("Component package permits app relocation outside /Applications");
+    run("/usr/bin/hdiutil", [
+      "attach",
+      "-quiet",
+      "-readonly",
+      "-nobrowse",
+      "-noautoopen",
+      "-mountpoint", mountRoot,
+      artifact
+    ]);
+    const mountedApplication = path.join(mountRoot, `${contract.productName}.app`);
+    const applicationsLink = path.join(mountRoot, "Applications");
+    if (!fs.existsSync(path.join(mountedApplication, "Contents", "Info.plist"))) {
+      diskImageProblem = "Disk image is missing Go Rot.app";
+    } else if (!fs.existsSync(applicationsLink)) {
+      diskImageProblem = "Disk image is missing its Applications shortcut";
+    } else if (!fs.lstatSync(applicationsLink).isSymbolicLink()) {
+      diskImageProblem = "Disk image Applications item is not a symbolic link";
+    } else if (fs.readlinkSync(applicationsLink) !== "/Applications") {
+      diskImageProblem = "Disk image Applications link has the wrong destination";
     }
   } finally {
-    fs.rmSync(expansionRoot, { recursive: true, force: true });
+    run("/usr/bin/hdiutil", ["detach", "-quiet", mountRoot]);
+    fs.rmSync(mountRoot, { recursive: true, force: true });
   }
+  if (diskImageProblem) fail(diskImageProblem);
   if (options.sign) {
     run("/usr/bin/codesign", ["--verify", "--deep", "--strict", "--verbose=2", application]);
-    run("/usr/sbin/pkgutil", ["--check-signature", artifact]);
+    run("/usr/bin/codesign", ["--verify", "--verbose=2", artifact]);
   }
   if (options.notarize) {
     runXcrun(["stapler", "validate", artifact]);
     run("/usr/sbin/spctl", [
       "--assess",
       "--type",
-      "install",
+      "open",
+      "--context",
+      "context:primary-signature",
       "--verbose=2",
       artifact
     ]);
   }
 }
 
-function removePackageIntermediates() {
-  fs.rmSync(componentPackage, { recursive: true, force: true });
-  fs.rmSync(componentPlist, { force: true });
+function removeDiskImageIntermediates() {
+  fs.rmSync(diskImageRoot, { recursive: true, force: true });
 }
 
 function parseOptions(args) {
@@ -355,15 +357,6 @@ function readJson(filePath) {
 
 function sha256(filePath) {
   return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
-}
-
-function xmlEscape(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
 }
 
 function sourceCommit() {

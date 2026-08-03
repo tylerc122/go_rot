@@ -21,13 +21,21 @@ expect(contract.version === packageJson.version, "package version differs from r
 expect(contract.version === manifest.version, "extension version differs from release contract");
 expect(
   contract.delivery.artifactName ===
-    `${contract.artifactSlug}-macos-v${contract.version}.pkg`,
+    `${contract.artifactSlug}-macos-v${contract.version}.dmg`,
   "production artifact name differs from release contract"
 );
-expect(contract.delivery.bundleRuntime === true, "production package must bundle its runtime");
+expect(
+  contract.delivery.format === "signed-notarized-dmg",
+  "production delivery format must be a signed and notarized disk image"
+);
+expect(contract.delivery.bundleRuntime === true, "production disk image must bundle its runtime");
+expect(
+  contract.delivery.applicationPath === "/Applications/Go Rot.app",
+  "production app must run from /Applications"
+);
 expect(
   sameValues(contract.delivery.architectures, ["arm64", "x86_64"]),
-  "production package must support arm64 and x86_64"
+  "production disk image must support arm64 and x86_64"
 );
 expect(contract.runtime.name === "node", "production runtime must be Node.js");
 expect(
@@ -70,7 +78,6 @@ expect(
 );
 expect(
   contract.identifiers.appBundle === "dev.gorot.app" &&
-    contract.identifiers.installerPackage === "dev.gorot.pkg" &&
     contract.identifiers.nativeMessagingHost === "dev.gorot.companion",
   "release identifiers must use the gorot.dev namespace"
 );

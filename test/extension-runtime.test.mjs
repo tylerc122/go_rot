@@ -23,7 +23,6 @@ const cancelFinishClipCalls = [];
 const badgeText = [];
 const settings = {
   ...DEFAULT_SETTINGS,
-  agents: { ...DEFAULT_SETTINGS.agents },
   delayMs: 0
 };
 let nextWindowId = 100;
@@ -52,10 +51,13 @@ globalThis.chrome = {
   storage: {
     local: {
       async get(defaults) {
-        return { ...defaults, ...settings, agents: { ...settings.agents } };
+        return { ...defaults, ...settings };
       },
       async set(patch) {
         Object.assign(settings, patch);
+      },
+      async remove(key) {
+        delete settings[key];
       }
     }
   },

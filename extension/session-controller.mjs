@@ -1,9 +1,5 @@
 export const DEFAULT_SETTINGS = Object.freeze({
   enabled: true,
-  agents: Object.freeze({
-    codex: true,
-    "claude-code": true
-  }),
   pausedUntil: 0,
   provider: "youtube",
   shuffleFeeds: false,
@@ -50,7 +46,6 @@ export function isTerminalEvent(event) {
 export function sessionEligibility(settings, event, now = Date.now()) {
   if (!settings.enabled) return "disabled";
   if (settings.pausedUntil > now) return "paused";
-  if (settings.agents[event.agent] === false) return "agent-disabled";
   return "eligible";
 }
 
@@ -66,8 +61,6 @@ export function clampSettings(input = {}) {
   const provider = PROVIDERS[input.provider]
     ? input.provider
     : DEFAULT_SETTINGS.provider;
-  const agents =
-    input.agents && typeof input.agents === "object" ? input.agents : {};
   const enabledProviders = Array.isArray(input.enabledProviders)
     ? [...new Set(input.enabledProviders)].filter((candidate) => PROVIDERS[candidate])
     : [...DEFAULT_SETTINGS.enabledProviders];
@@ -81,16 +74,6 @@ export function clampSettings(input = {}) {
       typeof input.enabled === "boolean"
         ? input.enabled
         : DEFAULT_SETTINGS.enabled,
-    agents: {
-      codex:
-        typeof agents.codex === "boolean"
-          ? agents.codex
-          : DEFAULT_SETTINGS.agents.codex,
-      "claude-code":
-        typeof agents["claude-code"] === "boolean"
-          ? agents["claude-code"]
-          : DEFAULT_SETTINGS.agents["claude-code"]
-    },
     pausedUntil: clampNumber(
       input.pausedUntil,
       0,

@@ -10,11 +10,16 @@ const source = fs.readFileSync(
   "utf8"
 );
 
-test("the production package cannot relocate Go Rot onto a loose build", () => {
-  assert.match(source, /BundleIsRelocatable<\/key><false\/>/);
-  assert.match(source, /"\/usr\/bin\/pkgbuild"/);
-  assert.match(source, /"--component-plist", componentPlist/);
-  assert.match(source, /"--install-location", "\/Applications"/);
-  assert.match(source, /relocatable=\"false\"/);
-  assert.doesNotMatch(source, /"--component", application/);
+test("the production disk image provides a verified drag-to-Applications install", () => {
+  assert.match(source, /fs\.symlinkSync\("\/Applications"/);
+  assert.match(source, /"\/usr\/bin\/hdiutil"/);
+  assert.match(source, /"create"/);
+  assert.match(source, /"-format", "UDZO"/);
+  assert.match(source, /"-srcfolder", diskImageRoot/);
+  assert.match(source, /"verify", artifact/);
+  assert.match(source, /"attach"/);
+  assert.match(source, /fs\.readlinkSync\(applicationsLink\) !== "\/Applications"/);
+  assert.match(source, /"--type",\s*"open"/);
+  assert.match(source, /"context:primary-signature"/);
+  assert.doesNotMatch(source, /pkgbuild|productbuild|BundleIsRelocatable/);
 });

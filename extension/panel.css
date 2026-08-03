@@ -575,8 +575,7 @@ select {
   text-align: center;
 }
 
-.permission-row,
-.agent-row {
+.permission-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -594,22 +593,19 @@ select {
   margin-top: 0;
 }
 
-.permission-row > span:first-child,
-.agent-row > span:first-child {
+.permission-row > span:first-child {
   display: flex;
   min-width: 0;
   flex: 1;
   flex-direction: column;
 }
 
-.permission-row strong,
-.agent-row strong {
+.permission-row strong {
   font-size: 0.8rem;
   font-weight: 700;
 }
 
-.permission-row small,
-.agent-row small {
+.permission-row small {
   margin-top: 1px;
   color: var(--muted);
   font-size: 0.7rem;
@@ -635,18 +631,6 @@ select {
 .compact {
   min-height: 36px;
   white-space: nowrap;
-}
-
-.agents {
-  padding-bottom: 8px;
-}
-
-.agent-row {
-  min-height: 54px;
-}
-
-.agent-row + .agent-row {
-  border-top: 1px solid var(--rule);
 }
 
 .footer {

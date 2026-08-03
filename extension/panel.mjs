@@ -32,8 +32,6 @@ const elements = {
   pauseDuration: document.querySelector("#pause-duration"),
   pause: document.querySelector("#pause"),
   resume: document.querySelector("#resume"),
-  agentClaude: document.querySelector("#agent-claude"),
-  agentCodex: document.querySelector("#agent-codex"),
   return: document.querySelector("#return")
 };
 
@@ -121,9 +119,6 @@ function bindEvents() {
     await updateFeedControl("finishCurrentClip", elements.finishCurrentClip);
   });
 
-  elements.agentClaude.addEventListener("change", updateAgents);
-  elements.agentCodex.addEventListener("change", updateAgents);
-
   elements.pause.addEventListener("click", () => {
     updateSettings({
       pausedUntil: pauseDeadline(elements.pauseDuration.value)
@@ -175,15 +170,6 @@ function bindEvents() {
   });
 }
 
-function updateAgents() {
-  updateSettings({
-    agents: {
-      "claude-code": elements.agentClaude.checked,
-      codex: elements.agentCodex.checked
-    }
-  });
-}
-
 function updateSettings(patch) {
   settingsWrite = settingsWrite
     .then(() => send({ type: "settings.update", settings: patch }))
@@ -209,8 +195,6 @@ function render(next) {
 
   elements.enabled.checked = settings.enabled;
   elements.delay.value = String(settings.delayMs);
-  elements.agentClaude.checked = settings.agents["claude-code"];
-  elements.agentCodex.checked = settings.agents.codex;
   elements.shuffleFeeds.checked = settings.shuffleFeeds;
   elements.pauseMedia.checked = settings.pauseMedia;
   elements.finishCurrentClip.checked = settings.finishCurrentClip;

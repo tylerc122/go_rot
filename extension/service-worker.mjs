@@ -27,6 +27,7 @@ chrome.runtime.onStartup.addListener(connectNative);
 chrome.runtime.onInstalled.addListener(async () => {
   const stored = await chrome.storage.local.get(DEFAULT_SETTINGS);
   await chrome.storage.local.set(clampSettings(stored));
+  await chrome.storage.local.remove("agents");
   connectNative();
 });
 
