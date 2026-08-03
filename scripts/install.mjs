@@ -478,10 +478,13 @@ async function findAvailableLoopbackPort() {
 function findCodexCli() {
   const candidates = [
     process.env.CODEX_CLI_PATH,
+    path.join(targetHome, ".local", "bin", "codex"),
     ...String(process.env.PATH ?? "")
       .split(path.delimiter)
       .filter(Boolean)
       .map((directory) => path.join(directory, "codex")),
+    "/opt/homebrew/bin/codex",
+    "/usr/local/bin/codex",
     "/Applications/ChatGPT.app/Contents/Resources/codex",
     "/Applications/Codex.app/Contents/Resources/codex"
   ];

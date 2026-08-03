@@ -17,12 +17,16 @@ const buildRoot = path.join(root, "dist", "release");
 const application = path.join(buildRoot, `${contract.productName}.app`);
 const artifact = path.join(root, "dist", contract.delivery.artifactName);
 const checksumArtifact = `${artifact}.sha256`;
+const componentPackage = path.join(root, "dist", ".go-rot-component.pkg");
+const componentPlist = path.join(root, "dist", ".go-rot-components.plist");
 
 fs.mkdirSync(cache, { recursive: true });
 fs.rmSync(buildRoot, { recursive: true, force: true });
 fs.mkdirSync(buildRoot, { recursive: true });
 fs.rmSync(artifact, { force: true });
 fs.rmSync(checksumArtifact, { force: true });
+fs.rmSync(componentPackage, { recursive: true, force: true });
+fs.rmSync(componentPlist, { force: true });
 
 const runtimeArchives = prepareRuntimeArchives();
 buildApplication(runtimeArchives);
@@ -31,6 +35,7 @@ buildPackage();
 notarizeIfRequested();
 writeChecksum();
 verifyOutput();
+removePackageIntermediates();
 
 console.log(`Created ${application}`);
 console.log(`Created ${artifact}`);
@@ -99,7 +104,12 @@ function buildApplication(archives) {
   for (const relative of ["bin", "companion", "extension", "integrations"]) {
     fs.cpSync(path.join(root, relative), path.join(appResources, relative), { recursive: true });
   }
-  for (const relative of ["scripts/install.mjs", "scripts/doctor.mjs", "package.json"]) {
+  for (const relative of [
+    "scripts/install.mjs",
+    "scripts/doctor.mjs",
+    "scripts/codex-hook-status.mjs",
+    "package.json"
+  ]) {
     const destination = path.join(appResources, relative);
     fs.mkdirSync(path.dirname(destination), { recursive: true });
     fs.copyFileSync(path.join(root, relative), destination);
@@ -199,6 +209,20 @@ function signApplicationIfRequested() {
 }
 
 function buildPackage() {
+  writeComponentPlist();
+  run(
+    "/usr/bin/pkgbuild",
+    [
+      "--root", buildRoot,
+      "--component-plist", componentPlist,
+      "--identifier", contract.identifiers.appBundle,
+      "--version", contract.version,
+      "--install-location", "/Applications",
+      componentPackage
+    ],
+    { env: { ...process.env, COPYFILE_DISABLE: "1" } }
+  );
+
   const args = [];
   if (options.sign) {
     const identity = process.env.GO_ROT_INSTALLER_SIGNING_IDENTITY;
@@ -208,13 +232,25 @@ function buildPackage() {
   args.push(
     "--identifier", contract.identifiers.installerPackage,
     "--version", contract.version,
-    "--component", application,
-    "/Applications",
+    "--package", componentPackage,
     artifact
   );
   run("/usr/bin/productbuild", args, {
     env: { ...process.env, COPYFILE_DISABLE: "1" }
   });
+}
+
+function writeComponentPlist() {
+  fs.writeFileSync(componentPlist, `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><array><dict>
+<key>RootRelativeBundlePath</key><string>${xmlEscape(contract.productName)}.app</string>
+<key>BundleIsRelocatable</key><false/>
+<key>BundleIsVersionChecked</key><false/>
+<key>BundleHasStrictIdentifier</key><true/>
+<key>BundleOverwriteAction</key><string>upgrade</string>
+</dict></array></plist>
+`);
 }
 
 function notarizeIfRequested() {
@@ -244,6 +280,19 @@ function verifyOutput() {
     if (result.trim() !== `v${contract.runtime.version}`) fail(`Wrong bundled runtime for ${architecture}`);
   }
   run("/usr/sbin/pkgutil", ["--payload-files", artifact], { capture: true });
+  const expansionRoot = fs.mkdtempSync(path.join(os.tmpdir(), "go-rot-component-"));
+  const expanded = path.join(expansionRoot, "expanded");
+  try {
+    run("/usr/sbin/pkgutil", ["--expand", componentPackage, expanded], {
+      capture: true
+    });
+    const packageInfo = fs.readFileSync(path.join(expanded, "PackageInfo"), "utf8");
+    if (!packageInfo.includes('relocatable="false"')) {
+      fail("Component package permits app relocation outside /Applications");
+    }
+  } finally {
+    fs.rmSync(expansionRoot, { recursive: true, force: true });
+  }
   if (options.sign) {
     run("/usr/bin/codesign", ["--verify", "--deep", "--strict", "--verbose=2", application]);
     run("/usr/sbin/pkgutil", ["--check-signature", artifact]);
@@ -258,6 +307,11 @@ function verifyOutput() {
       artifact
     ]);
   }
+}
+
+function removePackageIntermediates() {
+  fs.rmSync(componentPackage, { recursive: true, force: true });
+  fs.rmSync(componentPlist, { force: true });
 }
 
 function parseOptions(args) {
@@ -301,6 +355,15 @@ function readJson(filePath) {
 
 function sha256(filePath) {
   return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+}
+
+function xmlEscape(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
 }
 
 function sourceCommit() {

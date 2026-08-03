@@ -79,7 +79,8 @@ for (const relativePath of [
   "release/macos/tool-launcher.c",
   "release/macos/node-entitlements.plist",
   "release/macos/GoRot.icns",
-  "scripts/package-release.mjs"
+  "scripts/package-release.mjs",
+  "scripts/codex-hook-status.mjs"
 ]) {
   expect(fs.existsSync(path.join(root, relativePath)), `missing release input: ${relativePath}`);
 }

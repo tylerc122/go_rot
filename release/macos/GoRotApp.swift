@@ -6,6 +6,7 @@ private enum SetupStage: Int {
   case welcome
   case agents
   case installing
+  case codexApproval
   case chrome
   case ready
   case failure
@@ -43,20 +44,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var lastProgressStage = SetupStage.welcome
   private var currentStage = SetupStage.welcome
   private var isPreview = false
+  private var codexTrustVerified = false
+  private var codexTrustCheckInFlight = false
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     NSApp.setActivationPolicy(.regular)
     NSApp.appearance = NSAppearance(named: .aqua)
+    isPreview = ProcessInfo.processInfo.environment["GO_ROT_ONBOARDING_PREVIEW"] != nil
     buildMenu()
     buildWindow()
 
     if let preview = ProcessInfo.processInfo.environment["GO_ROT_ONBOARDING_PREVIEW"] {
-      isPreview = true
       showPreview(named: preview)
-    } else if setupIsReady() {
-      showReady(requestNotifications: false)
+    } else if applicationNeedsInstalledCopy() {
+      if redirectToInstalledApplication() { return }
+      showMisplacedApplication()
     } else {
-      showWelcome()
+      showInitialSetupState()
     }
 
     if ProcessInfo.processInfo.environment["GO_ROT_ONBOARDING_CAPTURE_DIR"] == nil {
@@ -339,6 +343,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
   }
 
+  private func showCodexApproval(openAutomatically: Bool) {
+    render(
+      stage: .codexApproval,
+      eyebrow: "ONE CODEX APPROVAL",
+      headline: "Let Codex trust\nGo Rot.",
+      body: "Codex protects new local hooks. In the window we open, enter /hooks and approve Go Rot once. We’ll continue automatically.",
+      state: "Waiting for Codex approval…",
+      button: "Open Codex",
+      buttonEnabled: true,
+      footer: "Codex keeps control of which local hooks may run",
+      action: { [weak self] in self?.openCodexHookReview() }
+    )
+    showChangeAgentsAction()
+    startCodexApprovalPolling()
+    if openAutomatically {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+        guard self?.currentStage == .codexApproval else { return }
+        self?.openCodexHookReview()
+      }
+    }
+  }
+
   private func showChrome() {
     render(
       stage: .chrome,
@@ -362,15 +388,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       activeAgents.count == 2
         ? "Codex or Claude"
         : activeAgents[0]
-    let trustNote = activeAgents.contains("Codex")
-      ? " Codex may ask you to trust Go Rot once."
-      : ""
     let connectedItems = activeAgents + ["the Mac companion", "Chrome"]
     render(
       stage: .ready,
       eyebrow: "YOU’RE ALL SET",
       headline: "Ready to rot.",
-      body: "Prompt \(promptTarget). Your feed will open while it works and disappear when it needs you.\(trustNote)",
+      body: "Prompt \(promptTarget). Your feed will open while it works and disappear when it needs you.",
       state: "\(naturalList(connectedItems)) connected.",
       button: "Done",
       buttonEnabled: true,
@@ -487,6 +510,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       }
     case .chrome:
       openChromeStore()
+    case .codexApproval:
+      openCodexHookReview()
     case .ready:
       NSApp.terminate(nil)
     case .failure:
@@ -572,13 +597,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
           return
         }
 
-        if setupIsReady() {
-          self.showReady()
+        self.continueAfterAgentInstallation()
+      }
+    }
+  }
+
+  private func continueAfterAgentInstallation() {
+    let installed = goRotInstalledAgentTargets()
+    guard installed.contains("codex") else {
+      codexTrustVerified = false
+      continueAfterAgentSetup()
+      return
+    }
+
+    DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+      let trusted = codexHooksAreTrusted()
+      DispatchQueue.main.async {
+        guard let self else { return }
+        self.codexTrustVerified = trusted
+        if trusted {
+          self.continueAfterAgentSetup()
         } else {
-          self.showChrome()
-          self.openChromeStore()
+          self.showCodexApproval(openAutomatically: true)
         }
       }
+    }
+  }
+
+  private func continueAfterAgentSetup() {
+    if appSetupIsReady() {
+      showReady()
+    } else {
+      showChrome()
+      openChromeStore()
     }
   }
 
@@ -625,11 +676,178 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         timer.invalidate()
         return
       }
-      if setupIsReady() {
+      if self.appSetupIsReady() {
         timer.invalidate()
         self.showReady()
       }
     }
+  }
+
+  private func startCodexApprovalPolling() {
+    readinessTimer?.invalidate()
+    readinessTimer = Timer.scheduledTimer(withTimeInterval: 1.2, repeats: true) { [weak self] timer in
+      guard let self else {
+        timer.invalidate()
+        return
+      }
+      guard !self.codexTrustCheckInFlight else { return }
+      self.codexTrustCheckInFlight = true
+      DispatchQueue.global(qos: .utility).async { [weak self] in
+        let trusted = codexHooksAreTrusted()
+        DispatchQueue.main.async {
+          guard let self else { return }
+          self.codexTrustCheckInFlight = false
+          guard self.currentStage == .codexApproval, trusted else { return }
+          timer.invalidate()
+          self.codexTrustVerified = true
+          self.continueAfterAgentSetup()
+        }
+      }
+    }
+    readinessTimer?.fire()
+  }
+
+  private func appSetupIsReady() -> Bool {
+    let installed = goRotInstalledAgentTargets()
+    guard !installed.isEmpty, companionSocketIsReachable() else { return false }
+    return !installed.contains("codex") || codexTrustVerified
+  }
+
+  private func showInitialSetupState() {
+    let installed = goRotInstalledAgentTargets()
+    guard !installed.isEmpty else {
+      showWelcome()
+      return
+    }
+    if installed.contains("codex") {
+      codexTrustVerified = codexHooksAreTrusted()
+      guard codexTrustVerified else {
+        showCodexApproval(openAutomatically: false)
+        return
+      }
+    }
+    if appSetupIsReady() {
+      showReady(requestNotifications: false)
+    } else {
+      showChrome()
+    }
+  }
+
+  private func openCodexHookReview() {
+    guard let codex = codexCLIURL() else {
+      showFailure(
+        "Go Rot couldn’t find the Codex command-line app. Install or update Codex, then try again.",
+        retry: { [weak self] in self?.openCodexHookReview() }
+      )
+      return
+    }
+
+    let commandURL = FileManager.default.temporaryDirectory
+      .appendingPathComponent("go-rot-codex-review-\(UUID().uuidString).command")
+    let script = """
+      #!/bin/zsh
+      rm -f -- \(shellQuote(commandURL.path))
+      clear
+      printf '\\n  Go Rot needs one approval in Codex.\\n  Enter /hooks, review Go Rot, then choose Trust.\\n\\n'
+      exec \(shellQuote(codex.path)) --no-alt-screen
+      """
+    do {
+      try script.write(to: commandURL, atomically: true, encoding: .utf8)
+      try FileManager.default.setAttributes(
+        [.posixPermissions: 0o700],
+        ofItemAtPath: commandURL.path
+      )
+      guard NSWorkspace.shared.open(commandURL) else {
+        throw NSError(domain: "dev.gorot.app", code: 1)
+      }
+      stateLabel.stringValue = "Waiting for Codex approval…"
+    } catch {
+      showFailure(
+        "Go Rot couldn’t open Codex’s hook review. Open Codex in Terminal, enter /hooks, and approve Go Rot.",
+        retry: { [weak self] in self?.openCodexHookReview() }
+      )
+    }
+  }
+
+  private func applicationNeedsInstalledCopy() -> Bool {
+    let environment = ProcessInfo.processInfo.environment
+    if environment["GO_ROT_ALLOW_LOOSE_APP"] == "1" || isPreview { return false }
+    return Bundle.main.bundleURL.standardizedFileURL.path != productionApplicationURL().path
+  }
+
+  private func redirectToInstalledApplication() -> Bool {
+    let installed = productionApplicationURL()
+    guard FileManager.default.fileExists(atPath: installed.path) else { return false }
+    let configuration = NSWorkspace.OpenConfiguration()
+    configuration.activates = true
+    NSWorkspace.shared.openApplication(at: installed, configuration: configuration) { [weak self] _, error in
+      DispatchQueue.main.async {
+        if error == nil {
+          NSApp.terminate(nil)
+        } else {
+          self?.showMisplacedApplication()
+          self?.window.makeKeyAndOrderFront(nil)
+          NSApp.activate(ignoringOtherApps: true)
+        }
+      }
+    }
+    return true
+  }
+
+  private func showMisplacedApplication() {
+    render(
+      stage: .failure,
+      eyebrow: "OPEN THE INSTALLED APP",
+      headline: "This is a build copy.",
+      body: "Go Rot must run from Applications so Codex and Chrome always point to the same signed app. Use the installer package to put it there.",
+      state: "Nothing has been changed.",
+      button: "Get the installer",
+      buttonEnabled: true,
+      footer: "The installed copy will open automatically next time",
+      action: { [weak self] in self?.openInstaller() }
+    )
+  }
+
+  private func openInstaller() {
+    let dist = Bundle.main.bundleURL
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    if let package = (try? FileManager.default.contentsOfDirectory(
+      at: dist,
+      includingPropertiesForKeys: nil
+    ))?.first(where: { $0.lastPathComponent.hasPrefix("go-rot-macos-") && $0.pathExtension == "pkg" }) {
+      NSWorkspace.shared.open(package)
+    } else {
+      NSWorkspace.shared.open(URL(string: "https://gorot.dev/")!)
+    }
+  }
+
+  private func codexCLIURL() -> URL? {
+    let environment = ProcessInfo.processInfo.environment
+    let home = goRotHomeDirectory()
+    var candidates = [String]()
+    if let configured = environment["GO_ROT_CODEX_CLI"] {
+      candidates.append(configured)
+    }
+    if let configured = environment["CODEX_CLI_PATH"] {
+      candidates.append(configured)
+    }
+    candidates += [
+      home.appendingPathComponent(".local/bin/codex").path,
+      "/opt/homebrew/bin/codex",
+      "/usr/local/bin/codex",
+      "/Applications/Codex.app/Contents/Resources/codex",
+      "/Applications/ChatGPT.app/Contents/Resources/codex"
+    ] + String(environment["PATH"] ?? "")
+      .split(separator: ":")
+      .map { "\($0)/codex" }
+    return candidates.first(where: {
+      FileManager.default.isExecutableFile(atPath: $0)
+    }).map { URL(fileURLWithPath: $0) }
+  }
+
+  private func shellQuote(_ value: String) -> String {
+    "'\(value.replacingOccurrences(of: "'", with: "'\\''"))'"
   }
 
   private func runBundledScript(
@@ -670,6 +888,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     case "chrome":
       showChrome()
       readinessTimer?.invalidate()
+    case "codex":
+      showCodexApproval(openAutomatically: false)
+      readinessTimer?.invalidate()
     case "ready":
       showReady(requestNotifications: false)
     case "failure":
@@ -688,7 +909,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       let directory = ProcessInfo.processInfo.environment["GO_ROT_ONBOARDING_CAPTURE_DIR"]
     else { return }
 
-    let states = ["welcome", "agents", "installing", "chrome", "ready", "failure"]
+    let states = ["welcome", "agents", "installing", "codex", "chrome", "ready", "failure"]
     for (index, state) in states.enumerated() {
       let presentationDelay = 0.2 + Double(index) * 0.8
       DispatchQueue.main.asyncAfter(deadline: .now() + presentationDelay) { [weak self] in
@@ -1131,7 +1352,7 @@ private final class SetupProgressView: NSView {
 
   private func activeIndex() -> Int {
     switch stage {
-    case .welcome, .agents, .installing, .failure:
+    case .welcome, .agents, .installing, .codexApproval, .failure:
       return 0
     case .chrome:
       return 1
@@ -1165,6 +1386,11 @@ private extension NSColor {
 
 private let goRotNativeHostName = "dev.gorot.companion"
 
+private func productionApplicationURL() -> URL {
+  URL(fileURLWithPath: "/Applications/Go Rot.app", isDirectory: true)
+    .standardizedFileURL
+}
+
 private func goRotHomeDirectory() -> URL {
   if let configured = ProcessInfo.processInfo.environment["GO_ROT_HOME"],
      !configured.isEmpty {
@@ -1192,7 +1418,45 @@ private func goRotInstalledAgentTargets() -> Set<String> {
 }
 
 private func setupIsReady() -> Bool {
-  !goRotInstalledAgentTargets().isEmpty && companionSocketIsReachable()
+  let installed = goRotInstalledAgentTargets()
+  guard !installed.isEmpty, companionSocketIsReachable() else { return false }
+  return !installed.contains("codex") || codexHooksAreTrusted()
+}
+
+private func codexHooksAreTrusted() -> Bool {
+  let environment = ProcessInfo.processInfo.environment
+  if let override = environment["GO_ROT_CODEX_HOOKS_TRUSTED"] {
+    return override == "1"
+  }
+  guard let resources = Bundle.main.resourceURL else { return false }
+  let helper = resources
+    .appendingPathComponent("app", isDirectory: true)
+    .appendingPathComponent("scripts/codex-hook-status.mjs")
+  guard FileManager.default.fileExists(atPath: helper.path) else { return false }
+
+  #if arch(arm64)
+    let architecture = "arm64"
+  #else
+    let architecture = "x86_64"
+  #endif
+  let runtime = Bundle.main.bundleURL
+    .appendingPathComponent("Contents/Frameworks/node/\(architecture)/bin/node")
+  guard FileManager.default.isExecutableFile(atPath: runtime.path) else { return false }
+
+  let process = Process()
+  process.executableURL = runtime
+  process.arguments = [helper.path]
+  process.environment = environment
+  let output = Pipe()
+  process.standardOutput = output
+  process.standardError = output
+  do {
+    try process.run()
+    process.waitUntilExit()
+    return process.terminationStatus == 0
+  } catch {
+    return false
+  }
 }
 
 private func companionRuntimeDirectory() -> URL {

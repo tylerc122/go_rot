@@ -13,6 +13,7 @@ const source = fs.readFileSync(
 test("macOS onboarding presents one guided primary action", () => {
   assert.equal((source.match(/BrandButton\(title:/g) ?? []).length, 1);
   assert.match(source, /button: "Set up Go Rot"/);
+  assert.match(source, /button: "Open Codex"/);
   assert.match(source, /button: "Open in Chrome"/);
   assert.match(source, /button: "Done"/);
   assert.doesNotMatch(source, /button\("Check readiness"/);
@@ -62,6 +63,26 @@ test("macOS onboarding opens Chrome and detects readiness automatically", () => 
   assert.match(source, /Darwin\.connect/);
   assert.doesNotMatch(source, /FileAttributeType == \.typeSocket/);
   assert.match(source, /showReady\(\)/);
+});
+
+test("Codex setup requires real hook approval before readiness", () => {
+  assert.match(source, /case codexApproval/);
+  assert.match(source, /ONE CODEX APPROVAL/);
+  assert.match(source, /codexHooksAreTrusted/);
+  assert.match(source, /scripts\/codex-hook-status\.mjs/);
+  assert.match(source, /go-rot-codex-review-/);
+  assert.match(source, /Enter \/hooks, review Go Rot, then choose Trust/);
+  assert.doesNotMatch(source, /tell application "Terminal"/);
+  assert.match(source, /startCodexApprovalPolling/);
+  assert.match(source, /return !installed\.contains\("codex"\) \|\| codexHooksAreTrusted\(\)/);
+  assert.doesNotMatch(source, /Codex may ask you to trust Go Rot once/);
+});
+
+test("loose release builds cannot silently become the production app", () => {
+  assert.match(source, /\/Applications\/Go Rot\.app/);
+  assert.match(source, /GO_ROT_ALLOW_LOOSE_APP/);
+  assert.match(source, /This is a build copy/);
+  assert.match(source, /redirectToInstalledApplication/);
 });
 
 test("interactive preview never fakes Chrome readiness", () => {

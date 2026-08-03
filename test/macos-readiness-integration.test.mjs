@@ -58,14 +58,15 @@ test(
     );
     assert.equal(compilation.status, 0, compilation.stderr || compilation.stdout);
 
-    const probe = () =>
+    const probe = (trusted = "0") =>
       spawnSync(binary, ["--check-readiness"], {
         encoding: "utf8",
         env: {
           ...process.env,
           GO_ROT_HOME: home,
           GO_ROT_RUNTIME_DIR: runtime,
-          GO_ROT_EXPECTED_EXTENSION_ID: productionExtension
+          GO_ROT_EXPECTED_EXTENSION_ID: productionExtension,
+          GO_ROT_CODEX_HOOKS_TRUSTED: trusted
         }
       });
 
@@ -136,7 +137,11 @@ test(
         }
       })
     );
-    const live = probe();
+    const liveWithoutTrust = probe();
+    assert.equal(liveWithoutTrust.status, 1);
+    assert.equal(liveWithoutTrust.stdout.trim(), "waiting");
+
+    const live = probe("1");
     assert.equal(live.status, 0, live.stderr);
     assert.equal(live.stdout.trim(), "ready");
 
@@ -183,8 +188,13 @@ function startCompanion(socketPath, identityPath, extensionId) {
 function waitForReady(server) {
   return new Promise((resolve, reject) => {
     let output = "";
+    let errorOutput = "";
     const timeout = setTimeout(() => reject(new Error("companion server did not start")), 2_000);
     server.stdout.setEncoding("utf8");
+    server.stderr.setEncoding("utf8");
+    server.stderr.on("data", (chunk) => {
+      errorOutput += chunk;
+    });
     server.stdout.on("data", (chunk) => {
       output += chunk;
       if (!output.includes("READY")) return;
@@ -198,7 +208,11 @@ function waitForReady(server) {
     server.once("exit", (code, signal) => {
       if (output.includes("READY")) return;
       clearTimeout(timeout);
-      reject(new Error(`companion server exited early (${code ?? signal})`));
+      reject(
+        new Error(
+          `companion server exited early (${code ?? signal}): ${errorOutput.trim()}`
+        )
+      );
     });
   });
 }

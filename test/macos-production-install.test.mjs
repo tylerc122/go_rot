@@ -55,6 +55,7 @@ test(
       GO_ROT_APP_BUNDLE: appBundle,
       GO_ROT_NODE: bundledNode,
       GO_ROT_RUNTIME_DIR: runtime,
+      GO_ROT_CODEX_HOOKS_TRUSTED: "1",
       PATH: "/usr/bin:/bin:/usr/sbin:/sbin"
     };
 
@@ -165,6 +166,7 @@ function overlayCurrentResources(resources) {
   for (const relative of [
     "scripts/install.mjs",
     "scripts/doctor.mjs",
+    "scripts/codex-hook-status.mjs",
     "release/release-contract.json",
     "package.json"
   ]) {
