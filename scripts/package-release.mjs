@@ -18,6 +18,7 @@ const application = path.join(buildRoot, `${contract.productName}.app`);
 const artifact = path.join(root, "dist", contract.delivery.artifactName);
 const checksumArtifact = `${artifact}.sha256`;
 const diskImageRoot = path.join(root, "dist", ".go-rot-dmg");
+const diskImageReadWrite = path.join(root, "dist", ".go-rot-layout.dmg");
 
 fs.mkdirSync(cache, { recursive: true });
 fs.rmSync(buildRoot, { recursive: true, force: true });
@@ -25,6 +26,7 @@ fs.mkdirSync(buildRoot, { recursive: true });
 fs.rmSync(artifact, { force: true });
 fs.rmSync(checksumArtifact, { force: true });
 fs.rmSync(diskImageRoot, { recursive: true, force: true });
+fs.rmSync(diskImageReadWrite, { force: true });
 
 const runtimeArchives = prepareRuntimeArchives();
 buildApplication(runtimeArchives);
@@ -214,17 +216,97 @@ function buildDiskImage() {
     path.join(diskImageRoot, `${contract.productName}.app`)
   ]);
   fs.symlinkSync("/Applications", path.join(diskImageRoot, "Applications"));
+  const backgroundDirectory = path.join(diskImageRoot, ".background");
+  const background = path.join(backgroundDirectory, "install-background.png");
+  fs.mkdirSync(backgroundDirectory, { recursive: true });
+  buildDiskImageBackground(background);
+  fs.copyFileSync(
+    path.join(root, "release", "macos", "GoRot.icns"),
+    path.join(diskImageRoot, ".VolumeIcon.icns")
+  );
+  run("/usr/bin/chflags", ["hidden", backgroundDirectory]);
+  run("/usr/bin/chflags", ["hidden", path.join(diskImageRoot, ".VolumeIcon.icns")]);
   run("/usr/bin/hdiutil", [
     "create",
     "-quiet",
     "-ov",
     "-fs", "HFS+",
-    "-format", "UDZO",
-    "-imagekey", "zlib-level=9",
+    "-format", "UDRW",
     "-volname", contract.productName,
     "-srcfolder", diskImageRoot,
-    artifact
+    diskImageReadWrite
   ]);
+  configureDiskImageLayout();
+  run("/usr/bin/hdiutil", [
+    "convert",
+    diskImageReadWrite,
+    "-quiet",
+    "-format", "UDZO",
+    "-imagekey", "zlib-level=9",
+    "-o", artifact
+  ]);
+}
+
+function buildDiskImageBackground(destination) {
+  const generator = path.join(buildRoot, ".dmg-background-generator");
+  runXcrun([
+    "--sdk", "macosx", "swiftc",
+    path.join(root, "release", "macos", "DmgBackground.swift"),
+    "-framework", "Cocoa",
+    "-o", generator
+  ]);
+  run(generator, [destination]);
+  fs.rmSync(generator, { force: true });
+  const dimensions = run("/usr/bin/sips", [
+    "-g", "pixelWidth",
+    "-g", "pixelHeight",
+    destination
+  ], { capture: true });
+  if (!dimensions.includes("pixelWidth: 5120") || !dimensions.includes("pixelHeight: 3200")) {
+    fail("DMG background must render at 5120×3200 pixels");
+  }
+}
+
+function configureDiskImageLayout() {
+  const layoutScript = path.join(buildRoot, ".dmg-layout.applescript");
+  let mountRoot = null;
+  try {
+    const attachResult = run("/usr/bin/hdiutil", [
+      "attach",
+      "-readwrite",
+      "-noautoopen",
+      "-plist",
+      diskImageReadWrite
+    ], { capture: true });
+    mountRoot = diskImageMountPoint(attachResult);
+    runXcrun(["SetFile", "-a", "C", mountRoot]);
+    fs.writeFileSync(layoutScript, `
+tell application "Finder"
+  tell disk "${appleScriptEscape(path.basename(mountRoot))}"
+    open
+    set current view of container window to icon view
+    set toolbar visible of container window to false
+    set statusbar visible of container window to false
+    set the bounds of container window to {160, 120, 880, 580}
+    set viewOptions to the icon view options of container window
+    set arrangement of viewOptions to not arranged
+    set icon size of viewOptions to 104
+    set text size of viewOptions to 14
+    set shows icon preview of viewOptions to false
+    set background picture of viewOptions to file ".background:install-background.png"
+    set position of item "${appleScriptEscape(contract.productName)}.app" to {205, 243}
+    set position of item "Applications" to {515, 243}
+    update without registering applications
+    delay 2
+    close
+  end tell
+end tell
+`);
+    run("/usr/bin/osascript", [layoutScript]);
+  } finally {
+    if (mountRoot) run("/usr/bin/hdiutil", ["detach", "-quiet", mountRoot]);
+    fs.rmSync(layoutScript, { force: true });
+  }
 }
 
 function signDiskImageIfRequested() {
@@ -280,6 +362,7 @@ function verifyOutput() {
     ]);
     const mountedApplication = path.join(mountRoot, `${contract.productName}.app`);
     const applicationsLink = path.join(mountRoot, "Applications");
+    const background = path.join(mountRoot, ".background", "install-background.png");
     if (!fs.existsSync(path.join(mountedApplication, "Contents", "Info.plist"))) {
       diskImageProblem = "Disk image is missing Go Rot.app";
     } else if (!fs.existsSync(applicationsLink)) {
@@ -288,6 +371,10 @@ function verifyOutput() {
       diskImageProblem = "Disk image Applications item is not a symbolic link";
     } else if (fs.readlinkSync(applicationsLink) !== "/Applications") {
       diskImageProblem = "Disk image Applications link has the wrong destination";
+    } else if (!fs.existsSync(background)) {
+      diskImageProblem = "Disk image is missing its custom install background";
+    } else if (!fs.existsSync(path.join(mountRoot, ".DS_Store"))) {
+      diskImageProblem = "Disk image is missing its Finder window layout";
     }
   } finally {
     run("/usr/bin/hdiutil", ["detach", "-quiet", mountRoot]);
@@ -314,6 +401,7 @@ function verifyOutput() {
 
 function removeDiskImageIntermediates() {
   fs.rmSync(diskImageRoot, { recursive: true, force: true });
+  fs.rmSync(diskImageReadWrite, { force: true });
 }
 
 function parseOptions(args) {
@@ -357,6 +445,19 @@ function readJson(filePath) {
 
 function sha256(filePath) {
   return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+}
+
+function appleScriptEscape(value) {
+  return String(value).replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+}
+
+function diskImageMountPoint(plist) {
+  const match = plist.match(/<key>mount-point<\/key>\s*<string>([^<]+)<\/string>/);
+  if (!match) fail("Could not determine the mounted DMG path");
+  return match[1]
+    .replaceAll("&amp;", "&")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">");
 }
 
 function sourceCommit() {

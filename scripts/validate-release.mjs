@@ -83,6 +83,7 @@ expect(
 );
 for (const relativePath of [
   "release/macos/GoRotApp.swift",
+  "release/macos/DmgBackground.swift",
   "release/macos/tool-launcher.c",
   "release/macos/node-entitlements.plist",
   "release/macos/GoRot.icns",
